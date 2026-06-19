@@ -1,4 +1,4 @@
-package com.example.mission_resistance_app
+package com.lecoteaufleuri.missionresistance
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -1,6 +1,6 @@
 {
-    "name": "mission_resistance_app",
-    "short_name": "mission_resistance_app",
+    "name": "Mission Résistance",
+    "short_name": "Mission Résistance",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
