@@ -1,3 +1,7 @@
+# Outillage CI semantic-release (cf. package.json / .gitlab-ci.yml)
+node_modules/
+.npm/
+
 # Miscellaneous
 *.class
 *.log
