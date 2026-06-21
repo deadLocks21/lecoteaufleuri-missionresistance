@@ -44,6 +44,11 @@ class _CarnetViewState extends ConsumerState<CarnetView> {
     final snapshot = ref.watch(scenarioServiceProvider).asData?.value;
     if (snapshot == null) return const SizedBox.shrink();
 
+    // Équipe dont le scénario n'est pas encore saisi en régie : on n'a aucune
+    // mission à afficher (et `percent`/`missionAt` diviseraient/indexeraient par
+    // zéro). On montre un état d'attente plutôt que de planter.
+    if (snapshot.scenario.missions.isEmpty) return const _ScenarioPending();
+
     final total = snapshot.scenario.length;
     final current = snapshot.progress.currentMission;
 
@@ -197,6 +202,48 @@ class _CarnetViewState extends ConsumerState<CarnetView> {
     ref.read(tickerControllerProvider.notifier).show(
           advanced ? Strings.tickerMissionDone : Strings.tickerScenarioDone,
         );
+  }
+}
+
+/// État affiché quand l'équipe n'a pas (encore) de scénario côté backend.
+class _ScenarioPending extends StatelessWidget {
+  const _ScenarioPending();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SectionLabel(Strings.carnetTitle, topMargin: 2),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 40),
+          child: Column(
+            children: [
+              Text(
+                Strings.scenarioPendingTitle,
+                textAlign: TextAlign.center,
+                style: AppText.body(
+                  size: 14,
+                  weight: FontWeight.w700,
+                  color: TsfPalette.cream,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                Strings.scenarioPendingBody,
+                textAlign: TextAlign.center,
+                style: AppText.body(
+                  size: 12,
+                  weight: FontWeight.w500,
+                  color: const Color(0xFF9A9576),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }
 

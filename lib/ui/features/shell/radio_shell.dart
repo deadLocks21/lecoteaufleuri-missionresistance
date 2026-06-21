@@ -43,6 +43,7 @@ class _RadioShellState extends ConsumerState<RadioShell> {
     if (view == ShellTab.radio) return Strings.tickerRadio(team.channel);
     final snapshot = ref.watch(scenarioServiceProvider).asData?.value;
     if (snapshot == null) return '…';
+    if (snapshot.scenario.missions.isEmpty) return Strings.tickerScenarioPending;
     final mission = snapshot.currentMission;
     return Strings.tickerMission(
       snapshot.progress.currentMission + 1,

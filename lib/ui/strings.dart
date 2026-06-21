@@ -75,6 +75,13 @@ abstract final class Strings {
   static const tickerMissionDone = '✓ MISSION ACCOMPLIE';
   static const tickerScenarioDone = '✓ SCÉNARIO TERMINÉ';
 
+  // Carnet — scénario pas encore disponible (équipe sans missions côté backend)
+  static const scenarioPendingTitle = 'Scénario en préparation';
+  static const scenarioPendingBody =
+      "Les missions de ton équipe ne sont pas encore disponibles.\n"
+      'Réessaie une fois que le QG les aura transmises.';
+  static const tickerScenarioPending = '— SCÉNARIO EN PRÉPARATION —';
+
   // Modal de confirmation
   static const modalTitle = "Déchiffrer l'indice ?";
   static String modalMessage(int number) =>

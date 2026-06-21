@@ -6,16 +6,12 @@ import '../domain/ports/auth_port.dart';
 import '../domain/ports/dialer_port.dart';
 import '../domain/ports/emission_port.dart';
 import '../domain/ports/inbox_port.dart';
-import '../domain/ports/progress_store.dart';
-import '../domain/ports/scenario_port.dart';
 import '../domain/ports/session_store.dart';
 import 'auth/http_auth.dart';
 import 'dialer/url_launcher_dialer.dart';
 import 'http/api_config.dart';
 import 'memory/in_memory_auth.dart';
 import 'memory/in_memory_inbox.dart';
-import 'memory/in_memory_progress_store.dart';
-import 'memory/in_memory_scenario.dart';
 import 'mic/mic_emission.dart';
 import 'persistence/shared_prefs_session_store.dart';
 
@@ -65,11 +61,10 @@ final emissionPortProvider = Provider<EmissionPort>((ref) => MicEmission());
 
 final inboxPortProvider = Provider<InboxPort>((ref) => InMemoryInbox());
 
-final scenarioPortProvider =
-    Provider<ScenarioPort>((ref) => InMemoryScenario());
-
-final progressStoreProvider =
-    Provider<ProgressStore>((ref) => InMemoryProgressStore());
+// `scenarioPortProvider` et `progressStoreProvider` sont définis dans
+// `application/services/scenario_service.dart` : ils dépendent de
+// `currentTeamProvider` (couche application), qu'on évite d'importer ici pour
+// ne pas créer de cycle `di` ↔ `session_controller`.
 
 final dialerPortProvider = Provider<DialerPort>((ref) {
   final config = ref.watch(configProvider);
