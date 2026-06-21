@@ -27,6 +27,12 @@
 #   APP_STORE_CONNECT_PRIVATE_KEY        contenu du .p8 de la clé API
 #   CERTIFICATE_PRIVATE_KEY              clé privée du cert Apple Distribution
 #
+# Secrets optionnels (télémétrie Signoz — sans eux, l'app journalise en console
+# seulement, sans expédier vers Signoz) :
+#   SIGNOZ_INGEST_URL              endpoint OTLP HTTP, ex.
+#                                  https://ingest.eu.signoz.cloud:443/v1/logs
+#   SIGNOZ_INGESTION_KEY           clé d'ingestion Signoz Cloud (signoz-access-token)
+#
 # Variable requise (Settings → Secrets and variables → Actions → Variables) :
 #   APP_STORE_APPLE_ID             Apple ID numérique de l'app sur App Store
 #                                  Connect (nécessaire au calcul du build number iOS)
@@ -87,6 +93,12 @@ jobs:
       PACKAGE_NAME: "com.lecoteaufleuri.missionresistance"
       GCLOUD_SERVICE_ACCOUNT_CREDENTIALS: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_CREDENTIALS }}
       VERSION: ${{ needs.prepare.outputs.version }}
+      # Télémétrie Signoz injectée au build via --dart-define (cf.
+      # infrastructure/telemetry/telemetry_providers.dart). Sans
+      # SIGNOZ_INGEST_URL, l'app retombe sur le logger console (Signoz off).
+      SIGNOZ_INGEST_URL: ${{ secrets.SIGNOZ_INGEST_URL }}
+      SIGNOZ_INGESTION_KEY: ${{ secrets.SIGNOZ_INGESTION_KEY }}
+      SIGNOZ_ENV: "production"
 
     steps:
       - uses: actions/checkout@v4
@@ -148,7 +160,11 @@ jobs:
         run: |
           flutter build appbundle --release \
             --build-name="$VERSION" \
-            --build-number="${{ steps.build-number.outputs.build_number }}"
+            --build-number="${{ steps.build-number.outputs.build_number }}" \
+            --dart-define=APP_VERSION="$VERSION+${{ steps.build-number.outputs.build_number }}" \
+            --dart-define=SIGNOZ_INGEST_URL="$SIGNOZ_INGEST_URL" \
+            --dart-define=SIGNOZ_INGESTION_KEY="$SIGNOZ_INGESTION_KEY" \
+            --dart-define=SIGNOZ_ENV="$SIGNOZ_ENV"
 
       - name: Build APK (.apk)
         # APK universel attaché à la GitHub Release pour install directe /
@@ -157,7 +173,11 @@ jobs:
         run: |
           flutter build apk --release \
             --build-name="$VERSION" \
-            --build-number="${{ steps.build-number.outputs.build_number }}"
+            --build-number="${{ steps.build-number.outputs.build_number }}" \
+            --dart-define=APP_VERSION="$VERSION+${{ steps.build-number.outputs.build_number }}" \
+            --dart-define=SIGNOZ_INGEST_URL="$SIGNOZ_INGEST_URL" \
+            --dart-define=SIGNOZ_INGESTION_KEY="$SIGNOZ_INGESTION_KEY" \
+            --dart-define=SIGNOZ_ENV="$SIGNOZ_ENV"
 
       - name: Upload AAB + APK artifact
         uses: actions/upload-artifact@v4
@@ -187,6 +207,10 @@ jobs:
       BUNDLE_ID: "com.lecoteaufleuri.missionresistance"
       APP_STORE_APPLE_ID: ${{ vars.APP_STORE_APPLE_ID }}
       VERSION: ${{ needs.prepare.outputs.version }}
+      # Télémétrie Signoz injectée au build via --dart-define (cf. job Android).
+      SIGNOZ_INGEST_URL: ${{ secrets.SIGNOZ_INGEST_URL }}
+      SIGNOZ_INGESTION_KEY: ${{ secrets.SIGNOZ_INGESTION_KEY }}
+      SIGNOZ_ENV: "production"
 
     steps:
       - uses: actions/checkout@v4
@@ -254,7 +278,11 @@ jobs:
           flutter build ipa --release \
             --build-name="$VERSION" \
             --build-number="${{ steps.build-number.outputs.build_number }}" \
-            --export-options-plist="$HOME/export_options.plist"
+            --export-options-plist="$HOME/export_options.plist" \
+            --dart-define=APP_VERSION="$VERSION+${{ steps.build-number.outputs.build_number }}" \
+            --dart-define=SIGNOZ_INGEST_URL="$SIGNOZ_INGEST_URL" \
+            --dart-define=SIGNOZ_INGESTION_KEY="$SIGNOZ_INGESTION_KEY" \
+            --dart-define=SIGNOZ_ENV="$SIGNOZ_ENV"
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
