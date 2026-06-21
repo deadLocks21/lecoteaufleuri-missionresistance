@@ -10,10 +10,10 @@ import '../domain/ports/progress_store.dart';
 import '../domain/ports/scenario_port.dart';
 import 'dialer/url_launcher_dialer.dart';
 import 'memory/in_memory_auth.dart';
-import 'memory/in_memory_emission.dart';
 import 'memory/in_memory_inbox.dart';
 import 'memory/in_memory_progress_store.dart';
 import 'memory/in_memory_scenario.dart';
+import 'mic/mic_emission.dart';
 
 /// Câblage **ports → adapters** (inversion de dépendances, ARCHITECTURE §6.5).
 ///
@@ -45,8 +45,9 @@ final authPortProvider = Provider<AuthPort>((ref) {
   );
 });
 
-final emissionPortProvider =
-    Provider<EmissionPort>((ref) => InMemoryEmission());
+/// Le VU-mètre suit le micro réel ; passe à `InMemoryEmission()` pour revenir
+/// au jumeau (niveaux aléatoires, sans permission micro).
+final emissionPortProvider = Provider<EmissionPort>((ref) => MicEmission());
 
 final inboxPortProvider = Provider<InboxPort>((ref) => InMemoryInbox());
 
