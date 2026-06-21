@@ -9,15 +9,14 @@ import '../../domain/value_objects/gps_position.dart';
 /// Adapter réel de [LocationTrackingPort] via `geolocator` (gratuit, package
 /// standard — pas de licence, cf. discussion de faisabilité).
 ///
-/// - **Android** : `foregroundNotificationConfig` → l'écoute du flux tourne en
-///   service de premier plan (notification permanente), donc continue téléphone
-///   en poche.
-/// - **iOS** : `allowBackgroundLocationUpdates` + le background mode `location`
-///   de l'Info.plist + permission « Toujours ».
+/// Tourne dans l'**isolate d'arrière-plan** de `flutter_foreground_task` : c'est
+/// lui qui fournit le service de premier plan (notification permanente). On ne
+/// met donc **pas** de `foregroundNotificationConfig` ici (sinon double
+/// service / double notif). iOS conserve `allowBackgroundLocationUpdates` + le
+/// background mode `location` de l'Info.plist.
 ///
 /// L'adapter **possède** l'abonnement capteur : [positions] le démarre (de façon
-/// idempotente) et [stop] l'annule pour de bon — annuler l'abonnement arrête
-/// aussi le service de premier plan Android.
+/// idempotente) et [stop] l'annule.
 class GeolocatorLocationTracking implements LocationTrackingPort {
   GeolocatorLocationTracking({this.distanceFilterMeters = 50});
 
@@ -31,21 +30,24 @@ class GeolocatorLocationTracking implements LocationTrackingPort {
   bool _active = false;
 
   @override
-  Future<bool> ensurePermission() async {
-    // Le service système de localisation doit être activé (hors web).
+  Future<bool> ensurePermission() => ensureLocationPermission();
+
+  /// Demande/escalade la permission de localisation. **Statique** pour être
+  /// appelée côté UI (où l'utilisateur peut répondre au dialogue) sans
+  /// instancier l'adapter, qui vit lui dans l'isolate d'arrière-plan.
+  ///
+  /// « whileInUse » suffit : tant que le service de premier plan tourne, l'app
+  /// est « en cours d'utilisation » et la localisation continue en poche. Le
+  /// « Toujours » reste un bonus de robustesse (à accorder dans les réglages).
+  static Future<bool> ensureLocationPermission() async {
     if (!kIsWeb) {
       final enabled = await Geolocator.isLocationServiceEnabled();
       if (!enabled) return false;
     }
-
     var perm = await Geolocator.checkPermission();
     if (perm == LocationPermission.denied) {
       perm = await Geolocator.requestPermission();
     }
-    // « whileInUse » suffit au service de premier plan tant que l'app est
-    // visible ; pour le vrai fond (poche, écran éteint) l'utilisateur doit
-    // accorder « Toujours » dans les réglages (Android 11+ ne le propose pas en
-    // popup). On démarre quand même avec ce qu'on a.
     return perm == LocationPermission.whileInUse ||
         perm == LocationPermission.always;
   }
@@ -91,15 +93,11 @@ class GeolocatorLocationTracking implements LocationTrackingPort {
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
+        // Pas de foregroundNotificationConfig : le service de premier plan est
+        // fourni par flutter_foreground_task (sinon double service / notif).
         return AndroidSettings(
           accuracy: accuracy,
           distanceFilter: distanceFilterMeters,
-          foregroundNotificationConfig: const ForegroundNotificationConfig(
-            notificationTitle: 'Suivi de position actif',
-            notificationText:
-                'Le poste transmet sa position pendant le jeu.',
-            enableWakeLock: true,
-          ),
         );
       case TargetPlatform.iOS:
       case TargetPlatform.macOS:

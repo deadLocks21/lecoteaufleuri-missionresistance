@@ -50,11 +50,10 @@ class _MissionResistanceAppState extends ConsumerState<MissionResistanceApp>
         // Liveness : relance le suivi si un OEM a tué le service en fond.
         tracking.ensureAlive();
       case AppLifecycleState.paused:
-        // Flush pour que les logs / positions bufferisés partent avant une
-        // éventuelle suspension par l'OS.
+        // Flush des logs bufferisés avant suspension. Les positions, elles,
+        // sont gérées par l'isolate d'arrière-plan, qui continue de tourner.
         logger.info('app.paused');
         logger.flush();
-        tracking.flush();
       case AppLifecycleState.inactive:
       case AppLifecycleState.detached:
       case AppLifecycleState.hidden:

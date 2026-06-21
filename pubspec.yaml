@@ -45,6 +45,7 @@ dependencies:
   # Télémétrie : expédition OTLP/HTTP des logs vers Signoz + id de session.
   dio: ^5.7.0
   uuid: ^4.5.1
+  flutter_foreground_task: ^9.2.2
 
 dev_dependencies:
   flutter_test:

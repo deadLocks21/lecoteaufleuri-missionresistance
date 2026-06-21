@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app/mission_resistance_app.dart';
@@ -9,6 +10,10 @@ import 'infrastructure/telemetry/telemetry_providers.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Port de communication isolate d'arrière-plan (suivi GPS) → isolate UI,
+  // pour remonter les points capturés tant que l'app est ouverte.
+  FlutterForegroundTask.initCommunicationPort();
 
   // Orientation portrait verrouillée + rendu edge-to-edge (BRIEF §13).
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
