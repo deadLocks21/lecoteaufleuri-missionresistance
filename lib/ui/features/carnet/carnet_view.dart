@@ -1,55 +1,120 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../application/config/timings.dart';
 import '../../../application/services/scenario_service.dart';
 import '../../../application/services/tracking_service.dart';
 import '../../../domain/value_objects/mission_progress.dart';
 import '../../state/ticker_controller.dart';
 import '../../strings.dart';
 import '../../theme/app_colors.dart';
+import '../../theme/app_curves.dart';
 import '../../theme/app_text_styles.dart';
+import '../../widgets/app_icons.dart';
 import '../../widgets/k_button.dart';
 import '../../widgets/section_label.dart';
 import 'clue_card.dart';
 import 'confirm_modal.dart';
 
-/// Onglet « Carnet de mission » (BRIEF §9) : progression, stepper des missions,
+/// Onglet « Carnet de mission » (BRIEF §9) : progression, missions débloquées,
 /// et cartes-indices déchiffrables séquentiellement pour la mission en cours.
-class CarnetView extends ConsumerWidget {
+///
+/// Les missions **non débloquées** (à venir) sont masquées ; les missions
+/// **terminées** sont repliées par défaut et peuvent être dépliées pour revoir
+/// leurs indices. À l'ouverture, on défile jusqu'à la mission en cours.
+class CarnetView extends ConsumerStatefulWidget {
   const CarnetView({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CarnetView> createState() => _CarnetViewState();
+}
+
+class _CarnetViewState extends ConsumerState<CarnetView> {
+  /// Repère la mission en cours pour le défilement automatique d'entrée.
+  final _currentKey = GlobalKey();
+
+  /// Index des missions terminées actuellement dépliées.
+  final _expanded = <int>{};
+
+  /// Le défilement d'entrée n'est planifié qu'une fois par affichage du carnet.
+  bool _scrollScheduled = false;
+
+  @override
+  Widget build(BuildContext context) {
     final snapshot = ref.watch(scenarioServiceProvider).asData?.value;
     if (snapshot == null) return const SizedBox.shrink();
 
     final total = snapshot.scenario.length;
     final current = snapshot.progress.currentMission;
 
+    // Au premier rendu utile, défile jusqu'à la mission en cours (inutile si
+    // c'est la première : rien n'est empilé au-dessus).
+    if (!_scrollScheduled && current > 0) {
+      _scrollScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToCurrent());
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const SectionLabel(Strings.carnetTitle, topMargin: 2),
         _ProgressBar(percent: snapshot.percent, current: current, total: total),
-        for (var i = 0; i < total; i++) ...[
+        // Seules les missions débloquées (terminées + en cours) sont affichées.
+        for (var i = 0; i <= current; i++) ...[
           _MissionStep(
+            key: i == current ? _currentKey : null,
             index: i,
             current: current,
             title: snapshot.scenario.missionAt(i).title,
-            expanded:
-                i == current ? _currentMission(context, ref, snapshot) : null,
+            isExpanded: i == current || _expanded.contains(i),
+            onToggleExpand: i < current ? () => _toggleExpanded(i) : null,
+            child: i == current
+                ? _currentMission(snapshot)
+                : (_expanded.contains(i) ? _pastClues(snapshot, i) : null),
           ),
-          if (i != total - 1) const SizedBox(height: 8),
+          if (i != current) const SizedBox(height: 8),
         ],
       ],
     );
   }
 
-  Widget _currentMission(
-    BuildContext context,
-    WidgetRef ref,
-    ScenarioSnapshot snapshot,
-  ) {
+  void _toggleExpanded(int index) {
+    setState(() {
+      if (!_expanded.remove(index)) _expanded.add(index);
+    });
+  }
+
+  void _scrollToCurrent() {
+    final ctx = _currentKey.currentContext;
+    if (!mounted || ctx == null) return;
+    Scrollable.ensureVisible(
+      ctx,
+      alignment: 0.04,
+      duration: const Duration(milliseconds: 500),
+      curve: AppCurves.standard,
+    );
+  }
+
+  /// Tous les indices d'une mission terminée, en lecture seule.
+  Widget _pastClues(ScenarioSnapshot snapshot, int missionIndex) {
+    final mission = snapshot.scenario.missionAt(missionIndex);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: 10),
+        for (var k = 0; k < mission.clueCount; k++) ...[
+          ClueCard(
+            number: k + 1,
+            text: mission.clues[k].text,
+            state: ClueCardState.revealed,
+          ),
+          if (k != mission.clueCount - 1) const SizedBox(height: 8),
+        ],
+      ],
+    );
+  }
+
+  Widget _currentMission(ScenarioSnapshot snapshot) {
     final mission = snapshot.currentMission;
     final progress = snapshot.progress;
     final unlocked = progress.unlockedForCurrent;
@@ -64,8 +129,6 @@ class CarnetView extends ConsumerWidget {
             text: mission.clues[k].text,
             state: _cardState(k, unlocked, progress, mission.index),
             onTap: () => _onCardTap(
-              context,
-              ref,
               k,
               _cardState(k, unlocked, progress, mission.index),
             ),
@@ -83,7 +146,7 @@ class CarnetView extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 8),
-        KButton(Strings.missionDone, onTap: () => _completeMission(ref)),
+        KButton(Strings.missionDone, onTap: _completeMission),
       ],
     );
   }
@@ -103,12 +166,7 @@ class CarnetView extends ConsumerWidget {
     return ClueCardState.locked;
   }
 
-  Future<void> _onCardTap(
-    BuildContext context,
-    WidgetRef ref,
-    int k,
-    ClueCardState state,
-  ) async {
+  Future<void> _onCardTap(int k, ClueCardState state) async {
     final service = ref.read(scenarioServiceProvider.notifier);
     final ticker = ref.read(tickerControllerProvider.notifier);
 
@@ -126,7 +184,7 @@ class CarnetView extends ConsumerWidget {
     }
   }
 
-  Future<void> _completeMission(WidgetRef ref) async {
+  Future<void> _completeMission() async {
     final advanced =
         await ref.read(scenarioServiceProvider.notifier).completeMission();
     if (!advanced) {
@@ -208,21 +266,31 @@ class _ProgressBar extends StatelessWidget {
 
 class _MissionStep extends StatelessWidget {
   const _MissionStep({
+    super.key,
     required this.index,
     required this.current,
     required this.title,
-    this.expanded,
+    required this.isExpanded,
+    this.onToggleExpand,
+    this.child,
   });
 
   final int index;
   final int current;
   final String title;
-  final Widget? expanded;
+  final bool isExpanded;
+
+  /// Bascule pli/dépli (missions terminées uniquement) ; `null` = non dépliable.
+  final VoidCallback? onToggleExpand;
+
+  /// Contenu déployé (cartes-indices) ou `null` si replié.
+  final Widget? child;
 
   @override
   Widget build(BuildContext context) {
     final done = index < current;
     final isCurrent = index == current;
+    final expandable = onToggleExpand != null;
 
     final tag = done
         ? Strings.tagDone
@@ -233,6 +301,48 @@ class _MissionStep extends StatelessWidget {
     final titleColor = isCurrent || done
         ? TsfPalette.cream
         : const Color(0xFF8B8A72);
+
+    Widget header = Row(
+      children: [
+        Expanded(
+          child: Text(
+            title,
+            style: AppText.body(
+              size: 14,
+              weight: FontWeight.w700,
+              color: titleColor,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ),
+        Text(
+          tag,
+          style: AppText.body(
+            size: 10,
+            weight: FontWeight.w600,
+            color: tagColor,
+            letterSpacing: 1,
+          ),
+        ),
+        if (expandable) ...[
+          const SizedBox(width: 8),
+          AnimatedRotation(
+            turns: isExpanded ? 0.5 : 0,
+            duration: Timings.toggle,
+            curve: AppCurves.standard,
+            child: AppIcons.chevron(16, tagColor),
+          ),
+        ],
+      ],
+    );
+
+    if (expandable) {
+      header = GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onToggleExpand,
+        child: header,
+      );
+    }
 
     final step = Container(
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
@@ -264,42 +374,26 @@ class _MissionStep extends StatelessWidget {
           _StepNumber(done: done, current: isCurrent, label: '${index + 1}'),
           const SizedBox(width: 11),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        title,
-                        style: AppText.body(
-                          size: 14,
-                          weight: FontWeight.w700,
-                          color: titleColor,
-                          letterSpacing: 0.3,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      tag,
-                      style: AppText.body(
-                        size: 10,
-                        weight: FontWeight.w600,
-                        color: tagColor,
-                        letterSpacing: 1,
-                      ),
-                    ),
-                  ],
-                ),
-                ?expanded,
-              ],
+            child: AnimatedSize(
+              duration: Timings.toggle,
+              curve: AppCurves.standard,
+              alignment: Alignment.topCenter,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  header,
+                  ?child,
+                ],
+              ),
             ),
           ),
         ],
       ),
     );
 
-    return done ? Opacity(opacity: 0.62, child: step) : step;
+    // Les missions terminées repliées sont estompées ; dépliées, elles
+    // reprennent toute leur lisibilité.
+    return (done && !isExpanded) ? Opacity(opacity: 0.62, child: step) : step;
   }
 }
 

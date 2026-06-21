@@ -23,6 +23,9 @@ abstract final class AppIcons {
   static const _play =
       '<svg viewBox="0 0 24 24" fill="#000"><path d="M8 5v14l11-7z"/></svg>';
 
+  static const _chevron =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+
   static Widget _icon(String svg, double size, Color color) => SvgPicture.string(
         svg,
         width: size,
@@ -36,4 +39,5 @@ abstract final class AppIcons {
   static Widget carnet(double size, Color color) => _icon(_carnet, size, color);
   static Widget lock(double size, Color color) => _icon(_lock, size, color);
   static Widget play(double size, Color color) => _icon(_play, size, color);
+  static Widget chevron(double size, Color color) => _icon(_chevron, size, color);
 }
