@@ -1,5 +1,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Réseau : envoi des logs (Signoz) et des positions (suivi GPS). Requis en
+         release (Flutter ne l'ajoute automatiquement qu'en debug/profile). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Suivi GPS des équipes : position + service de premier plan pour
+         continuer téléphone en poche (cf. discussion de faisabilité). -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <application
         android:label="Mission Résistance"
         android:name="${applicationName}"

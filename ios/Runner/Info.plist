@@ -68,5 +68,13 @@
 	</array>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Le micro alimente le VU-mètre et l'émission radio du poste.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Le poste transmet la position de l'équipe pendant le jeu pour la suivre sur la carte.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Le poste transmet la position de l'équipe pendant le jeu, même téléphone en poche, pour la suivre sur la carte.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 </dict>
 </plist>

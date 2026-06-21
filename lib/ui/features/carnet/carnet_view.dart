@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../application/services/scenario_service.dart';
+import '../../../application/services/tracking_service.dart';
 import '../../../domain/value_objects/mission_progress.dart';
 import '../../state/ticker_controller.dart';
 import '../../strings.dart';
@@ -128,6 +129,13 @@ class CarnetView extends ConsumerWidget {
   Future<void> _completeMission(WidgetRef ref) async {
     final advanced =
         await ref.read(scenarioServiceProvider.notifier).completeMission();
+    if (!advanced) {
+      // Scénario terminé : 1ʳᵉ sécurité d'arrêt du suivi GPS (la date limite
+      // est la 2ᵉ, côté TrackingService).
+      ref
+          .read(trackingServiceProvider.notifier)
+          .stop(TrackingStopReason.scenarioComplete);
+    }
     ref.read(tickerControllerProvider.notifier).show(
           advanced ? Strings.tickerMissionDone : Strings.tickerScenarioDone,
         );

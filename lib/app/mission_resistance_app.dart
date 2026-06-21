@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../application/services/tracking_service.dart';
 import '../application/session/session_controller.dart';
 import '../infrastructure/telemetry/telemetry_providers.dart';
 import '../ui/features/lock/lock_screen.dart';
@@ -28,6 +29,9 @@ class _MissionResistanceAppState extends ConsumerState<MissionResistanceApp>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Instancie le service de suivi dès le départ pour que son écoute de la
+    // session (démarrage au déverrouillage) soit branchée avant l'unlock.
+    ref.read(trackingServiceProvider.notifier);
   }
 
   @override
@@ -39,14 +43,18 @@ class _MissionResistanceAppState extends ConsumerState<MissionResistanceApp>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final logger = ref.read(loggerProvider);
+    final tracking = ref.read(trackingServiceProvider.notifier);
     switch (state) {
       case AppLifecycleState.resumed:
         logger.info('app.resumed');
+        // Liveness : relance le suivi si un OEM a tué le service en fond.
+        tracking.ensureAlive();
       case AppLifecycleState.paused:
-        // Flush pour que les logs bufferisés partent avant une éventuelle
-        // suspension par l'OS.
+        // Flush pour que les logs / positions bufferisés partent avant une
+        // éventuelle suspension par l'OS.
         logger.info('app.paused');
         logger.flush();
+        tracking.flush();
       case AppLifecycleState.inactive:
       case AppLifecycleState.detached:
       case AppLifecycleState.hidden:
