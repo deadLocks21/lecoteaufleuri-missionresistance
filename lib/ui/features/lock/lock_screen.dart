@@ -57,8 +57,9 @@ class _LockScreenState extends ConsumerState<LockScreen>
   @override
   Widget build(BuildContext context) {
     ref.listen<SessionState>(sessionControllerProvider, (previous, next) {
-      final wasInvalid = previous is Locked && previous.invalidCode;
-      if (next is Locked && next.invalidCode && !wasInvalid) {
+      final wasInvalid = previous is Locked && previous.error == LockError.invalidCode;
+      final isInvalid = next is Locked && next.error == LockError.invalidCode;
+      if (isInvalid && !wasInvalid) {
         _onBadCode();
       }
     });
@@ -73,7 +74,8 @@ class _LockScreenState extends ConsumerState<LockScreen>
 
     final (String hint, Color hintColor) = switch (session) {
       Unlocking() || Unlocked() => (Strings.lockHintOk, TsfPalette.green),
-      Locked(invalidCode: true) => (Strings.lockHintBad, TsfPalette.redGlow),
+      Locked(error: LockError.invalidCode) => (Strings.lockHintBad, TsfPalette.redGlow),
+      Locked(error: LockError.network) => (Strings.lockHintNetwork, TsfPalette.amber),
       _ => (Strings.lockHintIdle, TsfPalette.lcdText),
     };
 

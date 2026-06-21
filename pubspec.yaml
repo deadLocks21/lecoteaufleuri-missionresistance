@@ -46,6 +46,8 @@ dependencies:
   dio: ^5.7.0
   uuid: ^4.5.1
   flutter_foreground_task: ^9.2.2
+  # Persistance locale de la session (reconnexion auto : code + nom d'équipe).
+  shared_preferences: ^2.3.0
 
 dev_dependencies:
   flutter_test:

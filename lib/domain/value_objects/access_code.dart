@@ -18,6 +18,9 @@ class AccessCode {
 
   final String _normalized;
 
+  /// Valeur normalisée (à transmettre au backend ; le `toString` reste masqué).
+  String get value => _normalized;
+
   /// `true` si l'utilisateur n'a saisi que des espaces / rien.
   static bool isBlank(String raw) => raw.trim().isEmpty;
 

@@ -8,12 +8,16 @@ import '../domain/ports/emission_port.dart';
 import '../domain/ports/inbox_port.dart';
 import '../domain/ports/progress_store.dart';
 import '../domain/ports/scenario_port.dart';
+import '../domain/ports/session_store.dart';
+import 'auth/http_auth.dart';
 import 'dialer/url_launcher_dialer.dart';
+import 'http/api_config.dart';
 import 'memory/in_memory_auth.dart';
 import 'memory/in_memory_inbox.dart';
 import 'memory/in_memory_progress_store.dart';
 import 'memory/in_memory_scenario.dart';
 import 'mic/mic_emission.dart';
+import 'persistence/shared_prefs_session_store.dart';
 
 /// Câblage **ports → adapters** (inversion de dépendances, ARCHITECTURE §6.5).
 ///
@@ -37,13 +41,23 @@ final demoTeamProvider = Provider<Team>((ref) {
   );
 });
 
+/// Résolution du code → équipe. Backend configuré ([kApiBaseUrl] non vide) →
+/// login réseau ([HttpAuth]) ; sinon jumeau de démo (`6450` → `LES RENARDS`).
 final authPortProvider = Provider<AuthPort>((ref) {
   final config = ref.watch(configProvider);
-  return InMemoryAuth(
-    code: config.accessCode,
-    team: ref.watch(demoTeamProvider),
-  );
+  if (kApiBaseUrl.isEmpty) {
+    return InMemoryAuth(
+      code: config.accessCode,
+      team: ref.watch(demoTeamProvider),
+    );
+  }
+  return HttpAuth(baseUrl: kApiBaseUrl, channel: config.teamChannel);
 });
+
+/// Persistance locale de session (reconnexion auto sans redemander le code).
+/// Surchargée en test par `InMemorySessionStore`.
+final sessionStoreProvider =
+    Provider<SessionStore>((ref) => SharedPrefsSessionStore());
 
 /// Le VU-mètre suit le micro réel ; passe à `InMemoryEmission()` pour revenir
 /// au jumeau (niveaux aléatoires, sans permission micro).

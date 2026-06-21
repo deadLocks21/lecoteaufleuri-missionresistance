@@ -79,9 +79,14 @@ class _SessionGate extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Verrou tant que le code n'est pas validé (la transition de déverrouillage
-    // reste sur l'écran de code pendant 750 ms).
-    final unlocked = ref.watch(sessionControllerProvider) is Unlocked;
+    // `Restoring` (reconnexion auto) → splash ; `Unlocked` → shell ; sinon code.
+    // La transition de déverrouillage (`Unlocking`) reste sur l'écran de code.
+    final session = ref.watch(sessionControllerProvider);
+    final Widget child = switch (session) {
+      Unlocked() => const RadioShell(key: ValueKey('shell')),
+      Restoring() => const _StartupSplash(key: ValueKey('splash')),
+      _ => const LockScreen(key: ValueKey('lock')),
+    };
 
     return Scaffold(
       backgroundColor: TsfPalette.appBg,
@@ -89,9 +94,30 @@ class _SessionGate extends ConsumerWidget {
         label: Strings.a11yTitle,
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 300),
-          child: unlocked
-              ? const RadioShell(key: ValueKey('shell'))
-              : const LockScreen(key: ValueKey('lock')),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+/// Splash bref pendant la reconnexion automatique (lecture des shared
+/// preferences) — évite un clignotement de l'écran de code au lancement.
+class _StartupSplash extends StatelessWidget {
+  const _StartupSplash({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const ColoredBox(
+      color: TsfPalette.appBg,
+      child: Center(
+        child: SizedBox(
+          width: 28,
+          height: 28,
+          child: CircularProgressIndicator(
+            strokeWidth: 2.5,
+            color: TsfPalette.brass,
+          ),
         ),
       ),
     );

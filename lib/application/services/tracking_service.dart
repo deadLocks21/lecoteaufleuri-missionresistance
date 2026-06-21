@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../infrastructure/di.dart';
 import '../../infrastructure/telemetry/telemetry_providers.dart';
 import '../../infrastructure/tracking/geolocator_location_tracking.dart';
 import '../../infrastructure/tracking/tracking_config.dart';
@@ -158,7 +157,13 @@ class TrackingService extends Notifier<TrackingState> {
         ? maxByDuration
         : absolute;
 
-    final team = ref.read(demoTeamProvider);
+    final team = ref.read(currentTeamProvider);
+    if (team == null) {
+      // Pas d'équipe authentifiée : rien à suivre (ne devrait pas arriver, le
+      // suivi ne démarre qu'au déverrouillage).
+      _log('tracking.no_team');
+      return false;
+    }
     await FlutterForegroundTask.saveData(
       key: TrackingDataKeys.teamId,
       value: team.id,

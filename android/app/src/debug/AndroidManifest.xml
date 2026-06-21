@@ -4,4 +4,8 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Dev local : autorise le HTTP en clair (backend http://10.0.2.2:3000) en
+         build debug uniquement. Android 9+ le bloque par défaut. La release
+         reste sécurisée (prévoir HTTPS ou un network-security-config dédié). -->
+    <application android:usesCleartextTraffic="true" />
 </manifest>

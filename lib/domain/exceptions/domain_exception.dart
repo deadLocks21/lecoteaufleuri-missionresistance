@@ -21,6 +21,12 @@ class InvalidCodeException extends DomainException {
   const InvalidCodeException() : super('CODE INCORRECT — réessayez');
 }
 
+/// Backend injoignable / erreur réseau pendant le login — indice distinct du
+/// « code incorrect » (pas de shake : ce n'est pas la faute de l'utilisateur).
+class NetworkException extends DomainException {
+  const NetworkException() : super('RÉSEAU INDISPONIBLE — réessayez');
+}
+
 /// Échec d'ouverture du micro / d'émission.
 class EmissionException extends DomainException {
   const EmissionException([super.message = "Échec de l'émission"]);

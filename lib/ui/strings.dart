@@ -11,6 +11,7 @@ abstract final class Strings {
   static const lockHintIdle = '— en attente du code —';
   static const lockHintOk = 'Poste déverrouillé — bienvenue';
   static const lockHintBad = 'CODE INCORRECT — réessayez';
+  static const lockHintNetwork = 'RÉSEAU INDISPONIBLE — réessayez';
 
   // Onglets
   static const tabRadio = 'Radio';
