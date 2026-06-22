@@ -381,20 +381,25 @@ jobs:
           name: mission-resistance-ios
           path: artifacts/
 
-      - name: Publish to TestFlight (internal beta group, iOS)
+      - name: Publish to TestFlight (internal testers only, iOS)
         run: |
           WHATS_NEW=$(jq -r '.[] | select(.language=="fr-FR") | .text' release_notes.json)
           IPA_PATH=$(find artifacts -type f -name '*.ipa' | head -1)
           echo "Uploading: $IPA_PATH"
-          # NB : pas de `--beta-group` pour un groupe INTERNE : l'API App Store
-          # Connect refuse l'assignation explicite ("Cannot add internal group
-          # to a build"). Les testeurs internes reçoivent automatiquement tout
-          # build traité. `--beta-group` n'est à utiliser que pour des groupes
-          # EXTERNES.
+          # Test INTERNE uniquement : on ne passe NI `--testflight` NI
+          # `--beta-group`.
+          #   - `--testflight` soumettrait le build à la beta app review Apple
+          #     (= test EXTERNE), qui exige les infos « Test Information »
+          #     (Feedback Email, Beta App Review Information). Inutile et
+          #     bloquant pour de l'interne.
+          #   - `--beta-group` ne sert qu'aux groupes externes ; l'API refuse
+          #     d'y assigner un groupe interne.
+          # Les testeurs internes (rôles App Store Connect) reçoivent
+          # automatiquement tout build une fois traité par Apple. On se contente
+          # donc d'uploader et de renseigner le « What to Test » (`--whats-new`),
+          # visible aussi côté interne.
           app-store-connect publish \
             --path "$IPA_PATH" \
-            --testflight \
-            --expire-build-submitted-for-review \
             --locale fr-FR \
             --whats-new "$WHATS_NEW" \
             --max-find-build-wait 90
