@@ -3,14 +3,6 @@
 /// sans Riverpod ni Flutter pour rester importable des deux côtés.
 library;
 
-/// Base d'API du backend, ex. `http://10.0.2.2:3000` (émulateur Android → hôte)
-/// ou `https://…`. **Vide → pas de réseau** (jumeau en mémoire). Les
-/// dart-defines sont des constantes de compilation, donc lisibles dans
-/// **n'importe quel isolate**.
-///
-/// `flutter run --dart-define=TRACKING_API_URL=http://10.0.2.2:3000`
-const String kTrackingApiUrl = String.fromEnvironment('TRACKING_API_URL');
-
 const String _kTrackingDeadlineRaw =
     String.fromEnvironment('TRACKING_DEADLINE');
 

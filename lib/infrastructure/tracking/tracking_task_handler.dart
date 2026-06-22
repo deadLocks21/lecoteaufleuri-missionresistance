@@ -7,6 +7,7 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import '../../domain/ports/location_tracking_port.dart';
 import '../../domain/ports/position_reporter_port.dart';
 import '../../domain/value_objects/gps_position.dart';
+import '../http/api_config.dart';
 import '../memory/in_memory_position_reporter.dart';
 import 'geolocator_location_tracking.dart';
 import 'http_position_reporter.dart';
@@ -49,9 +50,9 @@ class TrackingTaskHandler extends TaskHandler {
 
     _tracker =
         GeolocatorLocationTracking(distanceFilterMeters: kDistanceFilterMeters);
-    _reporter = kTrackingApiUrl.isEmpty
+    _reporter = kApiBaseUrl.isEmpty
         ? InMemoryPositionReporter()
-        : HttpPositionReporter(baseUrl: kTrackingApiUrl, teamId: teamId);
+        : HttpPositionReporter(baseUrl: kApiBaseUrl, teamId: teamId);
 
     // La permission a été accordée côté UI avant le démarrage du service.
     try {
