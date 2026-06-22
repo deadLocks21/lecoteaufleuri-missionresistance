@@ -9,7 +9,7 @@ import '../../domain/value_objects/message_id.dart';
 import '../../infrastructure/di.dart';
 import '../../infrastructure/http/api_config.dart';
 import '../../infrastructure/memory/in_memory_inbox.dart';
-import '../../infrastructure/radio/http_inbox.dart';
+import '../../infrastructure/radio/push_inbox.dart';
 import '../config/timings.dart';
 import '../session/session_controller.dart';
 
@@ -19,10 +19,30 @@ class InboxService extends AsyncNotifier<List<RadioMessage>> {
   @override
   Future<List<RadioMessage>> build() async {
     final port = ref.watch(inboxPortProvider);
-    // Écoute des nouveaux messages (polling ~8 s en natif ; vide en démo).
+    // Mises à jour live : poussées par l'isolate de fond du suivi (seul poller
+    // pendant la partie) ; en démo le flux est vide.
     final sub = port.incoming().listen(_prepend);
     ref.onDispose(sub.cancel);
     return port.fetch();
+  }
+
+  /// Recharge le backlog depuis le serveur en **préservant** le statut local
+  /// (lu / à l'écoute) des messages déjà connus. Appelé au retour au premier
+  /// plan : les messages arrivés app fermée (où le push ne parvient pas à l'UI
+  /// suspendue) sont ainsi récupérés.
+  Future<void> refresh() async {
+    final fresh = await ref.read(inboxPortProvider).fetch();
+    final current = {
+      for (final m in state.asData?.value ?? const <RadioMessage>[])
+        m.id.value: m,
+    };
+    state = AsyncData([
+      for (final m in fresh)
+        if (current[m.id.value] case final existing?)
+          m.copyWith(status: existing.status)
+        else
+          m,
+    ]);
   }
 
   void _prepend(RadioMessage message) {
@@ -80,12 +100,13 @@ final inboxServiceProvider =
     AsyncNotifierProvider<InboxService, List<RadioMessage>>(InboxService.new);
 
 /// Boîte de réception : backend configuré ([kApiBaseUrl] non vide) → adapter
-/// réseau ([HttpInbox], scopé à l'équipe courante, polling ~8 s) ; sinon jumeau
-/// de démo (3 messages, sans push). Rebascule au déverrouillage (dépend de
+/// [PushInbox] (scopé à l'équipe courante : `fetch` HTTP au montage, nouveaux
+/// messages poussés par l'isolate de fond du suivi) ; sinon jumeau de démo
+/// (3 messages, sans push). Rebascule au déverrouillage (dépend de
 /// [currentTeamProvider]).
 final inboxPortProvider = Provider<InboxPort>((ref) {
   if (kApiBaseUrl.isEmpty) return InMemoryInbox();
   final Team team =
       ref.watch(currentTeamProvider) ?? ref.watch(demoTeamProvider);
-  return HttpInbox(baseUrl: kApiBaseUrl, teamId: team.id);
+  return PushInbox(baseUrl: kApiBaseUrl, teamId: team.id);
 });

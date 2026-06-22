@@ -41,3 +41,34 @@ List<RadioMessage> radioMessagesFromJson(
       for (final item in json)
         radioMessageFromJson(item as Map<String, dynamic>, audioBase: audioBase),
     ];
+
+/// Clé d'évènement transportée à l'isolate UI via `sendDataToMain` (à côté de
+/// l'évènement `fix` du suivi GPS).
+const String kRadioMessageEvent = 'radio';
+
+/// Sérialise un [RadioMessage] pour le passage **isolate de fond → isolate UI**
+/// (`sendDataToMain` n'accepte que des primitives). On transporte l'`audioUrl`
+/// déjà dérivée plutôt que de la recalculer côté UI.
+Map<String, Object?> radioMessageToData(RadioMessage message) => {
+      'event': kRadioMessageEvent,
+      'id': message.id.value,
+      'sender': message.sender,
+      'sentAt': message.sentAt.toIso8601String(),
+      'durationMs': message.duration.inMilliseconds,
+      'subtitle': message.subtitle,
+      'audioUrl': message.audioUrl,
+      'status': message.status.name,
+      'mine': message.mine,
+    };
+
+/// Reconstruit un [RadioMessage] côté UI depuis la charge de [radioMessageToData].
+RadioMessage radioMessageFromData(Map<dynamic, dynamic> data) => RadioMessage(
+      id: MessageId(data['id'] as String),
+      sender: data['sender'] as String,
+      sentAt: DateTime.parse(data['sentAt'] as String),
+      duration: Duration(milliseconds: (data['durationMs'] as num).round()),
+      subtitle: data['subtitle'] as String,
+      audioUrl: data['audioUrl'] as String?,
+      status: MessageStatus.values.byName(data['status'] as String),
+      mine: data['mine'] == true,
+    );

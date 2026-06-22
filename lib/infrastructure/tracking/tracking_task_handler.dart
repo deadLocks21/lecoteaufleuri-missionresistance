@@ -4,11 +4,15 @@ import 'dart:ui';
 
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 
+import '../../domain/entities/radio_message.dart';
 import '../../domain/ports/location_tracking_port.dart';
 import '../../domain/ports/position_reporter_port.dart';
 import '../../domain/value_objects/gps_position.dart';
 import '../http/api_config.dart';
 import '../memory/in_memory_position_reporter.dart';
+import '../notifications/local_notifier.dart';
+import '../radio/http_inbox.dart';
+import '../radio/radio_json.dart';
 import 'geolocator_location_tracking.dart';
 import 'http_position_reporter.dart';
 import 'tracking_config.dart';
@@ -36,6 +40,12 @@ class TrackingTaskHandler extends TaskHandler {
   DateTime? _lastReportAt;
   bool _hasFix = false;
   int _deadlineMillis = 0;
+
+  // Radio : ce handler est le **seul poller** des messages pendant la partie.
+  // Il notifie (messages reçus) et pousse tout nouveau message à l'UI.
+  HttpInbox? _inbox;
+  StreamSubscription<RadioMessage>? _radioSub;
+  LocalNotifier? _notifier;
 
   @override
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
@@ -82,6 +92,59 @@ class TrackingTaskHandler extends TaskHandler {
         stackTrace: st,
       );
     }
+
+    await _startRadioWatch(teamId);
+  }
+
+  /// Démarre la veille radio : `fetch()` **amorce** le set des ids déjà vus pour
+  /// ne pas notifier le backlog existant, puis le flux `incoming()` (sondage
+  /// ~8 s) émet les nouveaux messages → notification (reçus uniquement) + push à
+  /// l'UI. Sans backend (démo) : pas de service de fond → rien à faire ici.
+  Future<void> _startRadioWatch(String teamId) async {
+    if (kApiBaseUrl.isEmpty) return;
+    try {
+      _notifier = LocalNotifier();
+      final inbox = HttpInbox(baseUrl: kApiBaseUrl, teamId: teamId);
+      _inbox = inbox;
+      // Amorçage best-effort : en cas d'échec réseau, le 1er sondage (dans ~8 s)
+      // rejouera la liste ; le serveur plafonne à 50 messages, donc pas de
+      // tempête de notifications même dans ce cas dégradé.
+      try {
+        await inbox.fetch();
+      } catch (_) {/* amorçage best-effort */}
+      _radioSub = inbox.incoming().listen(
+        _onRadioMessage,
+        onError: (Object e, StackTrace st) => developer.log(
+          'tracking(bg): erreur de veille radio',
+          name: 'mission_resistance.tracking',
+          error: e,
+          stackTrace: st,
+        ),
+      );
+    } catch (e, st) {
+      developer.log(
+        'tracking(bg): veille radio impossible',
+        name: 'mission_resistance.tracking',
+        error: e,
+        stackTrace: st,
+      );
+    }
+  }
+
+  void _onRadioMessage(RadioMessage message) {
+    // Remonte le message à l'UI (mise à jour live quand l'app est ouverte).
+    FlutterForegroundTask.sendDataToMain(radioMessageToData(message));
+    // On ne notifie que les messages **reçus** (pas l'écho de ses propres
+    // émissions, déjà affichées « ÉMIS » côté UI).
+    if (!message.mine) {
+      unawaited(
+        _notifier?.showNewMessage(
+              messageId: message.id.value,
+              sender: message.sender,
+            ) ??
+            Future<void>.value(),
+      );
+    }
   }
 
   @override
@@ -107,6 +170,10 @@ class TrackingTaskHandler extends TaskHandler {
 
   @override
   Future<void> onDestroy(DateTime timestamp, bool isTimeout) async {
+    await _radioSub?.cancel();
+    _radioSub = null;
+    _inbox?.dispose();
+    _inbox = null;
     await _sub?.cancel();
     _sub = null;
     await _reporter?.flush();

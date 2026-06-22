@@ -78,6 +78,11 @@ class HttpInbox implements InboxPort {
     return radioMessagesFromJson(raw, audioBase: _audioBase);
   }
 
+  /// Libère le client HTTP (l'isolate de fond du suivi à l'arrêt du service).
+  /// L'éventuel flux [incoming] doit être annulé séparément (annulation de la
+  /// souscription, qui rompt sa boucle de sondage).
+  void dispose() => _dio.close(force: true);
+
   static String _trimTrailingSlash(String url) =>
       url.endsWith('/') ? url.substring(0, url.length - 1) : url;
 }

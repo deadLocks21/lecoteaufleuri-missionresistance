@@ -49,6 +49,10 @@ dependencies:
   # Persistance locale de la session (reconnexion auto : code + nom d'équipe).
   shared_preferences: ^2.3.0
   just_audio: ^0.10.5
+  # Notifications locales « nouveau message radio », postées depuis l'isolate
+  # d'arrière-plan du suivi (seul poller pendant la partie). Canal dédié, distinct
+  # de la notif permanente du service de premier plan.
+  flutter_local_notifications: ^22.0.1
 
 dev_dependencies:
   flutter_test:

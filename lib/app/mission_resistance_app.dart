@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../application/services/inbox_service.dart';
 import '../application/services/tracking_service.dart';
 import '../application/session/session_controller.dart';
 import '../infrastructure/telemetry/telemetry_providers.dart';
@@ -49,6 +50,11 @@ class _MissionResistanceAppState extends ConsumerState<MissionResistanceApp>
         logger.info('app.resumed');
         // Liveness : relance le suivi si un OEM a tué le service en fond.
         tracking.ensureAlive();
+        // Rattrape les messages arrivés app fermée : le push de l'isolate de
+        // fond ne parvient pas à l'UI suspendue, on recharge donc le backlog.
+        if (ref.read(sessionControllerProvider) is Unlocked) {
+          ref.read(inboxServiceProvider.notifier).refresh();
+        }
       case AppLifecycleState.paused:
         // Flush des logs bufferisés avant suspension. Les positions, elles,
         // sont gérées par l'isolate d'arrière-plan, qui continue de tourner.

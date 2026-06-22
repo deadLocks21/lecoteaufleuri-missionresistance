@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mission_resistance/domain/entities/radio_message.dart';
+import 'package:mission_resistance/domain/value_objects/message_id.dart';
 import 'package:mission_resistance/infrastructure/radio/radio_json.dart';
 
 /// Verrouille le **contrat JSON** des messages radio partagé avec l'API
@@ -55,6 +56,50 @@ void main() {
 
     test('liste vide → aucune tuile', () {
       expect(radioMessagesFromJson(const [], audioBase: audioBase), isEmpty);
+    });
+  });
+
+  group('transport isolate de fond → UI', () {
+    test('radioMessageToData/FromData fait un aller-retour sans perte', () {
+      final original = RadioMessage(
+        id: const MessageId('abc-123'),
+        sender: 'QG CENTRAL',
+        sentAt: DateTime.parse('2026-06-21T17:20:34.082Z'),
+        duration: const Duration(milliseconds: 4200),
+        subtitle: 'Transmission vocale',
+        audioUrl: '$audioBase/abc-123/audio',
+        status: MessageStatus.unread,
+      );
+
+      final data = radioMessageToData(original);
+      expect(data['event'], kRadioMessageEvent); // discriminant côté UI
+      final restored = radioMessageFromData(data);
+
+      expect(restored.id.value, original.id.value);
+      expect(restored.sender, original.sender);
+      expect(restored.sentAt.toUtc(), original.sentAt.toUtc());
+      expect(restored.duration, original.duration);
+      expect(restored.subtitle, original.subtitle);
+      expect(restored.audioUrl, original.audioUrl);
+      expect(restored.status, original.status);
+      expect(restored.mine, original.mine);
+    });
+
+    test('un message « mine » conserve son drapeau et son statut entendu', () {
+      final mine = RadioMessage(
+        id: const MessageId('own-1'),
+        sender: 'LES RENARDS',
+        sentAt: DateTime.parse('2026-06-21T18:39:07.581Z'),
+        duration: const Duration(milliseconds: 6163),
+        subtitle: 'Votre transmission',
+        audioUrl: '$audioBase/own-1/audio',
+        status: MessageStatus.heard,
+        mine: true,
+      );
+
+      final restored = radioMessageFromData(radioMessageToData(mine));
+      expect(restored.mine, isTrue);
+      expect(restored.status, MessageStatus.heard);
     });
   });
 }
