@@ -76,6 +76,15 @@ abstract final class Strings {
   static const tickerMissionDone = '✓ MISSION ACCOMPLIE';
   static const tickerScenarioDone = '✓ SCÉNARIO TERMINÉ';
 
+  // Carnet — fin de scénario (toutes les missions accomplies)
+  static const scenarioCompleteTitle = 'BRAVO !';
+  static const scenarioCompleteHeadline = 'Toutes les missions sont accomplies';
+  static const scenarioCompleteBody =
+      'Le scénario est terminé. Réinitialisez le poste pour repartir à zéro '
+      "(une nouvelle équipe pourra saisir son code), ou restez dans la partie.";
+  static const scenarioCompleteReset = 'Réinitialiser le poste';
+  static const scenarioCompleteStay = 'Rester dans la partie';
+
   // Carnet — scénario pas encore disponible (équipe sans missions côté backend)
   static const scenarioPendingTitle = 'Scénario en préparation';
   static const scenarioPendingBody =

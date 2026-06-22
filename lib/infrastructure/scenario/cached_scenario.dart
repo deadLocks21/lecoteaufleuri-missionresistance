@@ -20,7 +20,20 @@ class CachedScenario implements ScenarioPort {
 
   final ScenarioPort _network;
 
-  static String _key(String teamId) => 'scenario_cache:$teamId';
+  /// Préfixe des clés `shared_preferences` (une entrée par équipe).
+  static const String keyPrefix = 'scenario_cache:';
+
+  static String _key(String teamId) => '$keyPrefix$teamId';
+
+  /// Efface le scénario mis en cache de **toutes** les équipes (réinitialisation
+  /// du poste).
+  static Future<void> clearAll() async {
+    final prefs = await SharedPreferences.getInstance();
+    final keys = prefs.getKeys().where((k) => k.startsWith(keyPrefix)).toList();
+    for (final key in keys) {
+      await prefs.remove(key);
+    }
+  }
 
   @override
   Future<Scenario> load(Team team) async {

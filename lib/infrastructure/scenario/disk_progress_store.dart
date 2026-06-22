@@ -50,10 +50,23 @@ class DiskProgressStore implements ProgressStore {
   Future<void>? _inflight;
   Timer? _retryTimer;
 
-  String get _key => 'progress_cache:$teamId';
+  /// Préfixe des clés `shared_preferences` (une entrée par équipe).
+  static const String keyPrefix = 'progress_cache:';
+
+  String get _key => '$keyPrefix$teamId';
 
   static String _trimTrailingSlash(String url) =>
       url.endsWith('/') ? url.substring(0, url.length - 1) : url;
+
+  /// Efface la progression mise en cache de **toutes** les équipes
+  /// (réinitialisation du poste). N'affecte pas le backend.
+  static Future<void> clearAll() async {
+    final prefs = await SharedPreferences.getInstance();
+    final keys = prefs.getKeys().where((k) => k.startsWith(keyPrefix)).toList();
+    for (final key in keys) {
+      await prefs.remove(key);
+    }
+  }
 
   @override
   Future<MissionProgress?> read() async {

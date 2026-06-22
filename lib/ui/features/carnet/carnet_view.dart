@@ -15,6 +15,7 @@ import '../../widgets/k_button.dart';
 import '../../widgets/section_label.dart';
 import 'clue_card.dart';
 import 'confirm_modal.dart';
+import 'scenario_complete_modal.dart';
 
 /// Onglet « Carnet de mission » (BRIEF §9) : progression, missions débloquées,
 /// et cartes-indices déchiffrables séquentiellement pour la mission en cours.
@@ -192,16 +193,18 @@ class _CarnetViewState extends ConsumerState<CarnetView> {
   Future<void> _completeMission() async {
     final advanced =
         await ref.read(scenarioServiceProvider.notifier).completeMission();
-    if (!advanced) {
-      // Scénario terminé : 1ʳᵉ sécurité d'arrêt du suivi GPS (la date limite
-      // est la 2ᵉ, côté TrackingService).
-      ref
-          .read(trackingServiceProvider.notifier)
-          .stop(TrackingStopReason.scenarioComplete);
-    }
     ref.read(tickerControllerProvider.notifier).show(
           advanced ? Strings.tickerMissionDone : Strings.tickerScenarioDone,
         );
+    if (advanced || !mounted) return;
+
+    // Dernière mission accomplie (ou ré-appui dessus) : 1ʳᵉ sécurité d'arrêt du
+    // suivi GPS (la date limite est la 2ᵉ, côté TrackingService), puis écran de
+    // fin proposant de réinitialiser le poste ou de rester dans la partie.
+    ref
+        .read(trackingServiceProvider.notifier)
+        .stop(TrackingStopReason.scenarioComplete);
+    await showScenarioCompleteModal(context);
   }
 }
 
