@@ -5,13 +5,13 @@ import '../domain/entities/team.dart';
 import '../domain/ports/auth_port.dart';
 import '../domain/ports/dialer_port.dart';
 import '../domain/ports/emission_port.dart';
-import '../domain/ports/inbox_port.dart';
+import '../domain/ports/player_port.dart';
 import '../domain/ports/session_store.dart';
+import 'audio/just_audio_player.dart';
 import 'auth/http_auth.dart';
 import 'dialer/url_launcher_dialer.dart';
 import 'http/api_config.dart';
 import 'memory/in_memory_auth.dart';
-import 'memory/in_memory_inbox.dart';
 import 'mic/mic_emission.dart';
 import 'persistence/shared_prefs_session_store.dart';
 
@@ -55,16 +55,25 @@ final authPortProvider = Provider<AuthPort>((ref) {
 final sessionStoreProvider =
     Provider<SessionStore>((ref) => SharedPrefsSessionStore());
 
-/// Le VU-mètre suit le micro réel ; passe à `InMemoryEmission()` pour revenir
-/// au jumeau (niveaux aléatoires, sans permission micro).
+/// Le VU-mètre suit le micro réel et l'émission est enregistrée dans un fichier
+/// temporaire ; passe à `InMemoryEmission()` pour revenir au jumeau (niveaux
+/// aléatoires, sans capture ni permission micro).
 final emissionPortProvider = Provider<EmissionPort>((ref) => MicEmission());
 
-final inboxPortProvider = Provider<InboxPort>((ref) => InMemoryInbox());
+/// Lecteur audio des messages reçus (réception backend). Pas de jumeau requis :
+/// en démo, les messages n'ont pas d'`audioUrl` et la lecture est simulée.
+final playerPortProvider = Provider<PlayerPort>((ref) {
+  final player = JustAudioPlayer();
+  ref.onDispose(player.dispose);
+  return player;
+});
 
-// `scenarioPortProvider` et `progressStoreProvider` sont définis dans
-// `application/services/scenario_service.dart` : ils dépendent de
-// `currentTeamProvider` (couche application), qu'on évite d'importer ici pour
-// ne pas créer de cycle `di` ↔ `session_controller`.
+// Providers *scopés à l'équipe* définis côté Application (ils dépendent de
+// `currentTeamProvider`, qu'on évite d'importer ici pour ne pas créer de cycle
+// `di` ↔ `session_controller`) :
+//   • `scenarioPortProvider` / `progressStoreProvider` → scenario_service.dart
+//   • `inboxPortProvider`                              → inbox_service.dart
+//   • `outboxPortProvider`                             → emission_service.dart
 
 final dialerPortProvider = Provider<DialerPort>((ref) {
   final config = ref.watch(configProvider);

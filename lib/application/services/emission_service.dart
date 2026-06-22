@@ -2,9 +2,16 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../domain/entities/team.dart';
+import '../../domain/ports/outbox_port.dart';
 import '../../domain/value_objects/emission_level.dart';
+import '../../domain/value_objects/recording.dart';
 import '../../infrastructure/di.dart';
+import '../../infrastructure/http/api_config.dart';
+import '../../infrastructure/memory/in_memory_outbox.dart';
+import '../../infrastructure/radio/http_outbox.dart';
 import '../config/timings.dart';
+import '../session/session_controller.dart';
 
 /// Phase du push-to-talk.
 enum EmissionPhase { idle, live, sent }
@@ -47,8 +54,9 @@ class EmissionState {
   }
 }
 
-/// Pilote l'émission vocale (start/level/stop + chrono) via [EmissionPort].
-/// Le jumeau de démo fournit des niveaux aléatoires ; rien n'est enregistré.
+/// Pilote l'émission vocale (start/level/stop + chrono) via [EmissionPort], puis
+/// **diffuse** l'enregistrement via [OutboxPort]. La capture (micro) et l'envoi
+/// (réseau) sont deux ports distincts : le VU-mètre tourne même sans backend.
 class EmissionService extends Notifier<EmissionState> {
   Timer? _chrono;
   StreamSubscription<EmissionLevel>? _levelsSub;
@@ -79,7 +87,8 @@ class EmissionService extends Notifier<EmissionState> {
     });
   }
 
-  /// Relâché : clôt + diffuse, renvoie la durée (s) pour le libellé « (Xs) ».
+  /// Relâché : clôt la capture, diffuse en arrière-plan, renvoie la durée (s)
+  /// pour le libellé « (Xs) ».
   Future<int> stopTx() async {
     if (!state.isLive) return state.seconds;
     final seconds = state.seconds;
@@ -87,7 +96,8 @@ class EmissionService extends Notifier<EmissionState> {
     _chrono = null;
     await _levelsSub?.cancel();
     _levelsSub = null;
-    await ref.read(emissionPortProvider).stop();
+
+    final recording = await ref.read(emissionPortProvider).stop();
     state = EmissionState(
       phase: EmissionPhase.sent,
       seconds: seconds,
@@ -96,7 +106,19 @@ class EmissionService extends Notifier<EmissionState> {
     _resetTimer = Timer(Timings.pttSubReset, () {
       if (state.isSent) state = EmissionState.idle;
     });
+
+    // Diffusion **best-effort** en arrière-plan : l'UI passe en « envoyé » sans
+    // attendre le réseau (comme les push GPS/progression, eux aussi best-effort).
+    if (recording != null) unawaited(_broadcast(recording));
     return seconds;
+  }
+
+  Future<void> _broadcast(Recording recording) async {
+    try {
+      await ref.read(outboxPortProvider).send(recording);
+    } catch (_) {
+      // Un échec d'envoi ne casse pas l'expérience du poste.
+    }
   }
 
   void _cleanup() {
@@ -108,3 +130,13 @@ class EmissionService extends Notifier<EmissionState> {
 
 final emissionServiceProvider =
     NotifierProvider<EmissionService, EmissionState>(EmissionService.new);
+
+/// Diffusion d'une émission : backend configuré ([kApiBaseUrl] non vide) → upload
+/// réseau ([HttpOutbox], scopé à l'équipe courante) ; sinon jumeau de démo (écho,
+/// sans réseau). Rebascule au déverrouillage (dépend de [currentTeamProvider]).
+final outboxPortProvider = Provider<OutboxPort>((ref) {
+  if (kApiBaseUrl.isEmpty) return InMemoryOutbox();
+  final Team team =
+      ref.watch(currentTeamProvider) ?? ref.watch(demoTeamProvider);
+  return HttpOutbox(baseUrl: kApiBaseUrl, teamId: team.id);
+});

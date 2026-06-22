@@ -1,8 +1,8 @@
-import '../entities/radio_message.dart';
 import '../value_objects/emission_level.dart';
+import '../value_objects/recording.dart';
 
 /// Émission vocale push-to-talk. Le jumeau InMemory simule ; l'adapter natif
-/// branchera le micro réel (cf. ARCHITECTURE §9).
+/// branche le micro réel (cf. ARCHITECTURE §9).
 abstract interface class EmissionPort {
   /// Ouvre le micro (permission au 1ᵉʳ usage).
   Future<void> start();
@@ -10,6 +10,8 @@ abstract interface class EmissionPort {
   /// Flux d'amplitude → VU-mètre (aléatoire dans le jumeau, réel en natif).
   Stream<EmissionLevel> levels();
 
-  /// Clôt, (upload +) diffuse, et renvoie le message émis.
-  Future<RadioMessage> stop();
+  /// Clôt la capture et renvoie l'enregistrement à diffuser, ou `null` si rien
+  /// n'a été capté (jumeau de démo / permission refusée). La diffusion (upload)
+  /// est confiée à [OutboxPort].
+  Future<Recording?> stop();
 }

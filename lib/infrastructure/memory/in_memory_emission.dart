@@ -1,21 +1,18 @@
 import 'dart:math' as math;
 
-import '../../domain/entities/radio_message.dart';
 import '../../domain/ports/emission_port.dart';
 import '../../domain/value_objects/emission_level.dart';
-import '../../domain/value_objects/message_id.dart';
+import '../../domain/value_objects/recording.dart';
 
 /// Jumeau InMemory de [EmissionPort] : simule l'émission (BRIEF §2). Le flux de
 /// niveaux est **aléatoire** toutes les 110 ms ; rien n'est réellement
-/// enregistré ni diffusé. L'adapter natif branchera le micro (amplitude réelle).
+/// enregistré, donc `stop()` renvoie `null` (aucun enregistrement à diffuser).
+/// L'adapter natif branche le micro (amplitude réelle + capture fichier).
 class InMemoryEmission implements EmissionPort {
   final math.Random _rng = math.Random();
-  DateTime? _startedAt;
 
   @override
-  Future<void> start() async {
-    _startedAt = DateTime.now();
-  }
+  Future<void> start() async {}
 
   @override
   Stream<EmissionLevel> levels() => Stream<EmissionLevel>.periodic(
@@ -24,17 +21,5 @@ class InMemoryEmission implements EmissionPort {
       );
 
   @override
-  Future<RadioMessage> stop() async {
-    final started = _startedAt ?? DateTime.now();
-    final duration = DateTime.now().difference(started);
-    _startedAt = null;
-    // Message « émis » (diffusé aux autres postes en natif ; ignoré ici).
-    return RadioMessage(
-      id: MessageId('tx-${started.microsecondsSinceEpoch}'),
-      sender: 'CE POSTE',
-      sentAt: started,
-      duration: duration,
-      subtitle: 'Émission locale',
-    );
-  }
+  Future<Recording?> stop() async => null;
 }
