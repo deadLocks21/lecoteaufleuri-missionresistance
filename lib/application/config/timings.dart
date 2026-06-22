@@ -49,6 +49,10 @@ abstract final class Timings {
   /// Reset du sous-titre du PTT après envoi.
   static const pttSubReset = Duration(milliseconds: 2600);
 
+  /// Chargement simulé d'un message en démo (avant le début de la « lecture »),
+  /// le temps d'afficher le spinner. En natif, remplacé par le buffering réel.
+  static const loading = Duration(milliseconds: 500);
+
   /// Durée de lecture simulée d'un message : `max(2200, s×180)` ms (BRIEF §8.2).
   /// Remplacée par la vraie lecture audio en natif.
   static Duration playback(Duration messageDuration) =>

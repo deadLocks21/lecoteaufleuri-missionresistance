@@ -26,7 +26,7 @@ class MessageTile extends ConsumerWidget {
       '${d.inMinutes}:${(d.inSeconds % 60).toString().padLeft(2, '0')}';
 
   Future<void> _play(WidgetRef ref) async {
-    if (message.isPlaying) return;
+    if (message.isActive) return;
     final ticker = ref.read(tickerControllerProvider.notifier);
     ticker.show(Strings.tickerPlaying(message.sender));
     await ref.read(inboxServiceProvider.notifier).play(message.id);
@@ -35,7 +35,9 @@ class MessageTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final loading = message.isLoading;
     final playing = message.isPlaying;
+    final active = message.isActive;
     final heard = message.isHeard;
     final badge = message.mine
         ? Strings.badgeSent
@@ -52,14 +54,14 @@ class MessageTile extends ConsumerWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(9),
           border: Border.all(
-            color: playing ? TsfPalette.greenGlow : const Color(0xFF1F2117),
+            color: active ? TsfPalette.greenGlow : const Color(0xFF1F2117),
           ),
           gradient: const LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [Color(0xFF3F4330), Color(0x00333725)],
           ),
-          boxShadow: playing
+          boxShadow: active
               ? [
                   BoxShadow(
                     color: TsfPalette.greenGlow.withValues(alpha: 0.3),
@@ -124,7 +126,9 @@ class MessageTile extends ConsumerWidget {
               ),
             ),
             const SizedBox(width: 10),
-            if (playing)
+            if (loading)
+              const _Spinner()
+            else if (playing)
               const _Equalizer()
             else ...[
               Text(
@@ -178,6 +182,73 @@ class _Mlamp extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Spinner de chargement, visible pendant le buffering du clip (avant le début
+/// réel de la lecture). Arc vert tournant, dans l'emprise de l'égaliseur (16px).
+class _Spinner extends StatefulWidget {
+  const _Spinner();
+
+  @override
+  State<_Spinner> createState() => _SpinnerState();
+}
+
+class _SpinnerState extends State<_Spinner>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 800),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 16,
+      height: 16,
+      child: RotationTransition(
+        turns: _c,
+        child: CustomPaint(painter: _SpinnerPainter()),
+      ),
+    );
+  }
+}
+
+class _SpinnerPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2 - 1.5;
+    // Piste discrète.
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..color = TsfPalette.green.withValues(alpha: 0.2),
+    );
+    // Arc actif (~270°).
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      0,
+      math.pi * 1.5,
+      false,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..strokeCap = StrokeCap.round
+        ..color = TsfPalette.green,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_SpinnerPainter oldDelegate) => false;
 }
 
 /// Égaliseur 4 barres animées, visible pendant la lecture (BRIEF §8.2).

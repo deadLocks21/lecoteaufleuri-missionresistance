@@ -64,20 +64,28 @@ class InboxService extends AsyncNotifier<List<RadioMessage>> {
     final list = state.asData?.value;
     if (list == null) return;
     final index = list.indexWhere((m) => m.id.value == id.value);
-    if (index < 0 || list[index].isPlaying) return;
+    if (index < 0 || list[index].isActive) return;
 
     final message = list[index];
-    _setStatus(id, MessageStatus.playing);
+    // `loading` (spinner) tant que le clip n'a pas démarré ; `playing`
+    // (égaliseur) seulement quand le son commence réellement.
+    _setStatus(id, MessageStatus.loading);
     try {
       final url = message.audioUrl;
       if (url != null) {
-        await ref.read(playerPortProvider).play(url);
+        await ref.read(playerPortProvider).play(
+              url,
+              onPlaying: () => _setStatus(id, MessageStatus.playing),
+            );
       } else {
-        // Démo : pas de clip distant → lecture simulée (BRIEF §8.2).
+        // Démo : pas de clip distant → chargement puis lecture simulés
+        // (BRIEF §8.2).
+        await Future<void>.delayed(Timings.loading);
+        _setStatus(id, MessageStatus.playing);
         await Future<void>.delayed(Timings.playback(message.duration));
       }
     } catch (_) {
-      // Lecture best-effort : on n'enferme pas la tuile en « playing ».
+      // Lecture best-effort : on n'enferme pas la tuile en « loading »/« playing ».
     }
     await ref.read(inboxPortProvider).markHeard(id);
     _setStatus(id, MessageStatus.heard);

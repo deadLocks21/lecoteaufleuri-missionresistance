@@ -9,9 +9,10 @@ class JustAudioPlayer implements PlayerPort {
   final AudioPlayer _player = AudioPlayer();
 
   @override
-  Future<void> play(String url) async {
+  Future<void> play(String url, {void Function()? onPlaying}) async {
     await _player.stop();
-    await _player.setUrl(url);
+    await _player.setUrl(url); // chargement/buffering : complète une fois prêt
+    onPlaying?.call(); // le son va démarrer → passage en « lecture »
     _player.play(); // démarre ; on attend l'événement de fin ci-dessous
     await _player.playerStateStream.firstWhere(
       (s) => s.processingState == ProcessingState.completed,

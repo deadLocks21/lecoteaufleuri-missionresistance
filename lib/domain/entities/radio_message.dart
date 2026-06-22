@@ -5,6 +5,10 @@ enum MessageStatus {
   /// Non lu : badge `NOUVEAU`, voyant ambre.
   unread,
 
+  /// Chargement du clip (buffering) : spinner, en attente du début réel de
+  /// la lecture. Évite d'afficher l'égaliseur avant que le son ne démarre.
+  loading,
+
   /// En cours de lecture : égaliseur animé, durée/▶ masqués.
   playing,
 
@@ -45,7 +49,12 @@ class RadioMessage {
   final bool mine;
 
   bool get isUnread => status == MessageStatus.unread;
+  bool get isLoading => status == MessageStatus.loading;
   bool get isPlaying => status == MessageStatus.playing;
+
+  /// `true` tant que la lecture est en cours (chargement **ou** son actif) :
+  /// la tuile n'est pas re-déclenchable.
+  bool get isActive => isLoading || isPlaying;
   bool get isHeard => status == MessageStatus.heard;
 
   RadioMessage copyWith({MessageStatus? status}) {
