@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import '../../domain/entities/radio_message.dart';
 import '../../domain/ports/inbox_port.dart';
 import '../../domain/value_objects/message_id.dart';
+import 'heard_store.dart';
 import 'radio_json.dart';
 
 /// Adapter réseau de [InboxPort] : récupère les messages **du groupe** de
@@ -16,6 +17,7 @@ import 'radio_json.dart';
 class HttpInbox implements InboxPort {
   HttpInbox({required String baseUrl, required this.teamId, Dio? dio})
       : _base = _trimTrailingSlash(baseUrl),
+        _heard = HeardStore(teamId),
         _dio = dio ??
             Dio(
               BaseOptions(
@@ -29,6 +31,9 @@ class HttpInbox implements InboxPort {
   final Dio _dio;
   final String _base;
   final String teamId;
+
+  /// Statut « lu » persisté localement (durable entre deux lancements).
+  final HeardStore _heard;
 
   /// Ids déjà vus (semés par [fetch], enrichis par le polling) → on ne re-pousse
   /// pas un message déjà présent dans la boîte.
@@ -66,16 +71,24 @@ class HttpInbox implements InboxPort {
   }
 
   @override
-  Future<void> markHeard(MessageId id) async {
-    // Statut « lu » géré localement par l'app (un poste = un appareil) : aucun
-    // appel réseau pour l'instant.
-  }
+  Future<void> markHeard(MessageId id) => _heard.add(id.value);
 
   Future<List<RadioMessage>> _load() async {
     final resp = await _dio.get<Map<String, dynamic>>('/sessions/$teamId/radio');
     final raw = resp.data?['messages'];
     if (raw is! List) return const [];
-    return radioMessagesFromJson(raw, audioBase: _audioBase);
+    final messages = radioMessagesFromJson(raw, audioBase: _audioBase);
+    // Réapplique le « lu » persisté : un message déjà écouté lors d'une session
+    // précédente revient `heard` (et non `unread`) après un redémarrage.
+    final heard = await _heard.ids();
+    if (heard.isEmpty) return messages;
+    return [
+      for (final m in messages)
+        if (m.isUnread && heard.contains(m.id.value))
+          m.copyWith(status: MessageStatus.heard)
+        else
+          m,
+    ];
   }
 
   /// Libère le client HTTP (l'isolate de fond du suivi à l'arrêt du service).

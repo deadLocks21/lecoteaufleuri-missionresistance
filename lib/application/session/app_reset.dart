@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../infrastructure/radio/heard_store.dart';
 import '../../infrastructure/scenario/cached_scenario.dart';
 import '../../infrastructure/scenario/disk_progress_store.dart';
 import '../services/emission_service.dart';
@@ -33,6 +34,7 @@ class AppReset {
     // 2. Efface la progression et le scénario mis en cache (toutes équipes).
     await DiskProgressStore.clearAll();
     await CachedScenario.clearAll();
+    await HeardStore.clearAll();
 
     // 3. Déconnecte : efface la session mémorisée et reverrouille (→ écran de
     //    code). signOut bascule aussi le suivi en `stopped` via son écouteur.
