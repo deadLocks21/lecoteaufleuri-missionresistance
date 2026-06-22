@@ -53,6 +53,7 @@ abstract final class Strings {
   static const sectionReception = 'Réception · les plus récents en haut';
   static const badgeNew = 'NOUVEAU';
   static const badgeReplay = '↺ réécouter';
+  static const badgeSent = '✓ ÉMIS';
   static String tickerPlaying(String from) => '♪ LECTURE — $from';
   static String tickerPlayed(String from) => '✓ LECTURE TERMINÉE — $from';
 

@@ -12,6 +12,7 @@ import '../../infrastructure/memory/in_memory_outbox.dart';
 import '../../infrastructure/radio/http_outbox.dart';
 import '../config/timings.dart';
 import '../session/session_controller.dart';
+import 'inbox_service.dart';
 
 /// Phase du push-to-talk.
 enum EmissionPhase { idle, live, sent }
@@ -115,7 +116,10 @@ class EmissionService extends Notifier<EmissionState> {
 
   Future<void> _broadcast(Recording recording) async {
     try {
-      await ref.read(outboxPortProvider).send(recording);
+      final message = await ref.read(outboxPortProvider).send(recording);
+      // Émission confirmée (persistée) → apparaît tout de suite dans la
+      // réception, marquée « ÉMIS ». Échec → rien (pas de fausse confirmation).
+      ref.read(inboxServiceProvider.notifier).addSent(message);
     } catch (_) {
       // Un échec d'envoi ne casse pas l'expérience du poste.
     }

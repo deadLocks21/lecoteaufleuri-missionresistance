@@ -28,10 +28,29 @@ void main() {
       expect(m.sender, 'Les bleus');
       expect(m.duration, const Duration(milliseconds: 4200));
       expect(m.audioUrl, '$audioBase/abc-123/audio');
-      // Un message reçu est non lu par défaut.
+      // Un message reçu est non lu par défaut, et n'est pas « mine ».
       expect(m.status, MessageStatus.unread);
+      expect(m.mine, isFalse);
       // `sentAt` (UTC côté API) est ramené à l'heure locale sans dériver.
       expect(m.sentAt.toUtc(), DateTime.utc(2026, 6, 21, 17, 20, 34, 82));
+    });
+
+    test('un message « mine » est marqué émis et déjà entendu', () {
+      final m = radioMessagesFromJson(
+        [
+          {
+            'id': 'own-1',
+            'sender': 'Les bleus',
+            'sentAt': '2026-06-21T18:39:07.581Z',
+            'durationMs': 6163,
+            'mine': true,
+          },
+        ],
+        audioBase: audioBase,
+      ).single;
+      expect(m.mine, isTrue);
+      expect(m.status, MessageStatus.heard);
+      expect(m.audioUrl, '$audioBase/own-1/audio');
     });
 
     test('liste vide → aucune tuile', () {

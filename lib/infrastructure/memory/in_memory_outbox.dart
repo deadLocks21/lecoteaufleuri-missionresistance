@@ -7,19 +7,22 @@ import '../../domain/value_objects/message_id.dart';
 import '../../domain/value_objects/recording.dart';
 
 /// Jumeau InMemory de [OutboxPort] : « diffuse » sans réseau. Renvoie un message
-/// écho (jamais reçu par d'autres postes en démo) et nettoie le fichier capté
-/// par le micro réel (utilisé même en démo pour le VU-mètre).
+/// écho marqué `mine` (affiché « ÉMIS » dans la réception, comme en backend) et
+/// nettoie le fichier capté par le micro réel (utilisé même en démo pour le VU).
 class InMemoryOutbox implements OutboxPort {
   @override
   Future<RadioMessage> send(Recording recording) async {
-    unawaited(File(recording.path).delete().catchError((e) => File(recording.path)));
+    final file = File(recording.path);
+    unawaited(file.delete().catchError((_) => file));
     final now = DateTime.now();
     return RadioMessage(
       id: MessageId('tx-${now.microsecondsSinceEpoch}'),
       sender: 'CE POSTE',
       sentAt: now,
       duration: recording.duration,
-      subtitle: 'Émission locale',
+      subtitle: 'Votre transmission',
+      status: MessageStatus.heard,
+      mine: true,
     );
   }
 }

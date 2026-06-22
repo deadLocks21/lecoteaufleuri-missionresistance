@@ -12,7 +12,8 @@ enum MessageStatus {
   heard,
 }
 
-/// Message radio reçu d'un autre poste ou du QG. Trié récent → ancien.
+/// Message radio reçu d'un autre poste / du QG, ou **émis par ce poste**
+/// (`mine`). Trié récent → ancien.
 class RadioMessage {
   const RadioMessage({
     required this.id,
@@ -22,6 +23,7 @@ class RadioMessage {
     required this.subtitle,
     this.audioUrl,
     this.status = MessageStatus.unread,
+    this.mine = false,
   });
 
   final MessageId id;
@@ -38,6 +40,10 @@ class RadioMessage {
 
   final MessageStatus status;
 
+  /// `true` si ce message a été émis par ce poste : affiché « ÉMIS »
+  /// (confirmation d'envoi) plutôt que reçu d'un autre poste du groupe.
+  final bool mine;
+
   bool get isUnread => status == MessageStatus.unread;
   bool get isPlaying => status == MessageStatus.playing;
   bool get isHeard => status == MessageStatus.heard;
@@ -51,6 +57,7 @@ class RadioMessage {
       subtitle: subtitle,
       audioUrl: audioUrl,
       status: status ?? this.status,
+      mine: mine,
     );
   }
 }

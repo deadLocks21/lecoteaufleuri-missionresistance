@@ -37,9 +37,12 @@ class MessageTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final playing = message.isPlaying;
     final heard = message.isHeard;
-    final badge = message.isUnread ? Strings.badgeNew : Strings.badgeReplay;
-    final badgeColor =
-        message.isUnread ? TsfPalette.amber : const Color(0xFF9A9576);
+    final badge = message.mine
+        ? Strings.badgeSent
+        : (message.isUnread ? Strings.badgeNew : Strings.badgeReplay);
+    final badgeColor = message.mine
+        ? TsfPalette.green
+        : (message.isUnread ? TsfPalette.amber : const Color(0xFF9A9576));
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,

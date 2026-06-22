@@ -28,8 +28,15 @@ class InboxService extends AsyncNotifier<List<RadioMessage>> {
   void _prepend(RadioMessage message) {
     final list = state.asData?.value;
     if (list == null) return;
+    // Dédoublonnage : un message peut arriver via l'insertion immédiate après
+    // envoi *et* via le sondage suivant.
+    if (list.any((m) => m.id.value == message.id.value)) return;
     state = AsyncData([message, ...list]);
   }
+
+  /// Insère une **émission confirmée** (persistée par le backend) en tête, pour
+  /// un retour immédiat « message parti ✓ » sans attendre le prochain sondage.
+  void addSent(RadioMessage message) => _prepend(message);
 
   /// Joue un message : passe en `playing`, lit l'audio (réel si `audioUrl`,
   /// sinon délai simulé en démo), puis `heard` (et persiste le « lu »).
