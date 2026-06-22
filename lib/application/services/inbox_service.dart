@@ -74,9 +74,13 @@ class InboxService extends AsyncNotifier<List<RadioMessage>> {
     try {
       final url = message.audioUrl;
       if (url != null) {
+        // L'endpoint audio exige l'en-tête `X-Partie-Id` (sinon 400) : on le
+        // joint à la requête de lecture comme pour fetch/markHeard.
+        final partieId = ref.read(currentPartieIdProvider);
         await ref.read(playerPortProvider).play(
               url,
               onPlaying: () => _setStatus(id, MessageStatus.playing),
+              headers: partieId == null ? null : {'X-Partie-Id': partieId},
             );
       } else {
         // Démo : pas de clip distant → chargement puis lecture simulés

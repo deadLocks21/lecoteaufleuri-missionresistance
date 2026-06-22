@@ -213,6 +213,12 @@ class TrackingService extends Notifier<TrackingState> {
       notificationText: 'Le poste transmet sa position pendant le jeu.',
       callback: startTrackingCallback,
     );
+    if (result is ServiceRequestFailure) {
+      // On remonte la raison réelle du refus de l'OS (permission notif, type de
+      // service interdit en arrière-plan, localisation coupée…) plutôt que de la
+      // perdre derrière un `start_failed` générique.
+      _log('tracking.launch_rejected', error: result.error);
+    }
     return result is ServiceRequestSuccess;
   }
 
