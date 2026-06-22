@@ -268,6 +268,19 @@ Chaque écran lit son état via `ref.watch(...)` sur les `Notifier` de l'Applica
 
 Le code → équipe : en v1, `AuthPort` distant mappe le code vers l'équipe et son scénario (BRIEF §13.3). Le jumeau InMemory accepte le code de démo `6450` → `LES RENARDS`.
 
+`AuthPort.unlock` renvoie un `LoginResult {team, partie?}` : `partie` est la **partie active** du groupe de l'équipe au moment du login (cf. §8.1), ou `null` si aucune.
+
+### 8.1 Partie (session de jeu)
+
+La régie **démarre / arrête** une partie par groupe (au plus une active). Toutes les actions du poste sont **scopées à la partie courante** et la portent dans l'en‑tête **`X-Partie-Id`**.
+
+- **`PartieController`** (`application/session/`) est la source de vérité : amorcé depuis la session mémorisée (`StoredSession.partieId`, pour que l'en‑tête parte dès les premiers appels), puis **sonde** `GET /sessions/:team/partie` (~10 s, `PartiePort`). États : `PartieUnknown` → `PartieWaiting` (aucune) / `PartiePlaying(partie)` / `PartieOver`.
+- **`currentPartieIdProvider`** expose l'id en jeu ; les providers réseau scopés à la partie (`progressStoreProvider`, `inboxPortProvider`, `outboxPortProvider`, et le suivi GPS) le **watchent** → se reconstruisent à chaque changement de partie ⇒ **ardoise vierge** (la clé de cache locale de la progression inclut `partieId`).
+- **Fin de partie** : le backend renvoie **`410 partie_finished`** aux écritures. L'isolate GPS interprète ce code → **arrête le service** (`TrackingStopReason.partieEnded`) et signale l'isolate UI ; le `PartieController` (poll ou signal) bascule en `PartieOver`. Le suivi GPS ne démarre **que** quand une partie est en cours, et **relance** avec le nouvel id si la régie en ouvre une autre.
+- **UI** (`features/partie/partie_status_screen.dart`) : `PartieWaiting` → « en attente de partie » ; `PartieOver` → « partie terminée » ; le shell de jeu n'est rendu qu'en `PartiePlaying`.
+
+Le jumeau InMemory (`InMemoryPartie`) renvoie toujours une partie active → la démo joue immédiatement.
+
 ---
 
 ## 9. Émission vocale (push‑to‑talk)

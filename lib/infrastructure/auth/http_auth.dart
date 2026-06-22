@@ -4,6 +4,7 @@ import '../../domain/entities/team.dart';
 import '../../domain/exceptions/domain_exception.dart';
 import '../../domain/ports/auth_port.dart';
 import '../../domain/value_objects/access_code.dart';
+import '../../domain/value_objects/partie.dart';
 
 /// Adapter réseau de [AuthPort] : résout un code en équipe via le backend
 /// (`POST /auth/login`). `401` → [InvalidCodeException] (shake « code
@@ -31,7 +32,7 @@ class HttpAuth implements AuthPort {
   final String _channel;
 
   @override
-  Future<Team> unlock(AccessCode code) async {
+  Future<LoginResult> unlock(AccessCode code) async {
     try {
       final resp = await _dio.post<Map<String, dynamic>>(
         '/auth/login',
@@ -46,13 +47,24 @@ class HttpAuth implements AuthPort {
       if (id is! String || name is! String) {
         throw const NetworkException();
       }
-      return Team(id: id, name: name, channel: _channel);
+      return LoginResult(
+        team: Team(id: id, name: name, channel: _channel),
+        partie: _partie(resp.data?['partie']),
+      );
     } on DioException catch (e) {
       if (e.response?.statusCode == 401) {
         throw const InvalidCodeException();
       }
       throw const NetworkException();
     }
+  }
+
+  /// Partie active renvoyée au login (`{id,label}`), ou `null` si aucune.
+  Partie? _partie(Object? raw) {
+    if (raw is! Map) return null;
+    final id = raw['id'];
+    if (id is! String) return null;
+    return Partie(id: id, label: raw['label'] as String?);
   }
 
   static String _trimTrailingSlash(String url) =>

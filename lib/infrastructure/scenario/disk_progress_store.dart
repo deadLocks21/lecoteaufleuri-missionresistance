@@ -26,6 +26,7 @@ import 'progress_json.dart';
 class DiskProgressStore implements ProgressStore {
   DiskProgressStore({
     required this.teamId,
+    required this.partieId,
     required String baseUrl,
     Dio? dio,
     this.retryInterval = const Duration(seconds: 20),
@@ -38,10 +39,15 @@ class DiskProgressStore implements ProgressStore {
                 sendTimeout: const Duration(seconds: 8),
                 receiveTimeout: const Duration(seconds: 8),
                 contentType: 'application/json',
+                headers: {'X-Partie-Id': partieId},
               ),
             );
 
   final String teamId;
+
+  /// Partie courante : scope la progression (en-tête `X-Partie-Id` + clé de
+  /// cache local) → ardoise vierge à chaque nouvelle partie.
+  final String partieId;
   final String _path;
   final Dio _dio;
   final Duration retryInterval;
@@ -50,10 +56,10 @@ class DiskProgressStore implements ProgressStore {
   Future<void>? _inflight;
   Timer? _retryTimer;
 
-  /// Préfixe des clés `shared_preferences` (une entrée par équipe).
+  /// Préfixe des clés `shared_preferences` (une entrée par (équipe, partie)).
   static const String keyPrefix = 'progress_cache:';
 
-  String get _key => '$keyPrefix$teamId';
+  String get _key => '$keyPrefix$teamId:$partieId';
 
   static String _trimTrailingSlash(String url) =>
       url.endsWith('/') ? url.substring(0, url.length - 1) : url;
@@ -116,9 +122,28 @@ class DiskProgressStore implements ProgressStore {
       await _dio.put<dynamic>(_path, data: progressToJson(progress));
       _retryTimer?.cancel();
       _retryTimer = null;
-    } catch (e) {
+    } on DioException catch (e) {
+      // Partie terminée (410) : inutile de réessayer — la progression de cette
+      // partie est close. On abandonne l'état en attente (le contrôleur de
+      // partie bascule l'UI en « terminée » via son poll).
+      if (e.response?.statusCode == 410) {
+        _pending = null;
+        _retryTimer?.cancel();
+        _retryTimer = null;
+        return;
+      }
       // Échec réseau : on remet l'état en attente (sauf s'il a déjà été remplacé
       // par un plus récent) et on arme un retry périodique.
+      _pending ??= progress;
+      _armRetry();
+      developer.log(
+        'scenario: progression non synchronisée — réessai différé',
+        name: 'mission_resistance.scenario',
+        level: 900,
+        error: e,
+      );
+    } catch (e) {
+      // Erreur inattendue (non réseau) : on retente plus tard, best-effort.
       _pending ??= progress;
       _armRetry();
       developer.log(

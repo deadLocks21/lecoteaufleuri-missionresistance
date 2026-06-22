@@ -5,6 +5,7 @@ import '../domain/entities/team.dart';
 import '../domain/ports/auth_port.dart';
 import '../domain/ports/dialer_port.dart';
 import '../domain/ports/emission_port.dart';
+import '../domain/ports/partie_port.dart';
 import '../domain/ports/player_port.dart';
 import '../domain/ports/session_store.dart';
 import 'audio/just_audio_player.dart';
@@ -12,7 +13,9 @@ import 'auth/http_auth.dart';
 import 'dialer/url_launcher_dialer.dart';
 import 'http/api_config.dart';
 import 'memory/in_memory_auth.dart';
+import 'memory/in_memory_partie.dart';
 import 'mic/mic_emission.dart';
+import 'partie/http_partie.dart';
 import 'persistence/shared_prefs_session_store.dart';
 
 /// Câblage **ports → adapters** (inversion de dépendances, ARCHITECTURE §6.5).
@@ -54,6 +57,13 @@ final authPortProvider = Provider<AuthPort>((ref) {
 /// Surchargée en test par `InMemorySessionStore`.
 final sessionStoreProvider =
     Provider<SessionStore>((ref) => SharedPrefsSessionStore());
+
+/// État de partie : backend configuré → poll réseau ([HttpPartie]) ; sinon
+/// jumeau de démo ([InMemoryPartie], toujours une partie active).
+final partiePortProvider = Provider<PartiePort>((ref) {
+  if (kApiBaseUrl.isEmpty) return const InMemoryPartie();
+  return HttpPartie(baseUrl: kApiBaseUrl);
+});
 
 /// Le VU-mètre suit le micro réel et l'émission est enregistrée dans un fichier
 /// temporaire ; passe à `InMemoryEmission()` pour revenir au jumeau (niveaux

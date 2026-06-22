@@ -22,6 +22,8 @@ class HttpPositionReporter implements PositionReporterPort {
   HttpPositionReporter({
     required String baseUrl,
     required this.teamId,
+    this.partieId,
+    this.onPartieFinished,
     Dio? dio,
     this.flushInterval = const Duration(seconds: 20),
     this.maxBatchSize = 100,
@@ -37,12 +39,21 @@ class HttpPositionReporter implements PositionReporterPort {
                 receiveTimeout: const Duration(seconds: 15),
                 contentType: 'application/json',
                 responseType: ResponseType.plain,
+                headers: partieId == null ? null : {'X-Partie-Id': partieId},
               ),
             ) {
     _timer = Timer.periodic(flushInterval, (_) => unawaited(flush()));
   }
 
   final String teamId;
+
+  /// Partie active envoyée dans l'en-tête `X-Partie-Id`. `null` = aucune.
+  final String? partieId;
+
+  /// Appelé **une fois** quand le backend signale que la partie est terminée
+  /// (`410`) : l'isolate de suivi arrête alors le service de premier plan.
+  final void Function()? onPartieFinished;
+
   final String _endpoint;
   final String _heartbeatEndpoint;
   final Dio _dio;
@@ -53,6 +64,7 @@ class HttpPositionReporter implements PositionReporterPort {
   final List<GpsPosition> _buffer = [];
   Timer? _timer;
   bool _disposed = false;
+  bool _partieFinished = false;
   Future<void>? _inflight;
 
   static String _trimTrailingSlash(String url) =>
@@ -73,16 +85,26 @@ class HttpPositionReporter implements PositionReporterPort {
     if (_disposed) return;
     try {
       await _dio.post<dynamic>(_heartbeatEndpoint);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 410) {
+        _notifyPartieFinished();
+        return;
+      }
+      _logHeartbeatFailure(e);
     } catch (e) {
-      // Best-effort : un battement raté se rattrape au suivant, inutile de
-      // requeue (contrairement aux points de position).
-      developer.log(
-        'tracking: battement de cœur non délivré (réseau)',
-        name: 'mission_resistance.tracking',
-        level: 800,
-        error: e,
-      );
+      _logHeartbeatFailure(e);
     }
+  }
+
+  void _logHeartbeatFailure(Object e) {
+    // Best-effort : un battement raté se rattrape au suivant, inutile de
+    // requeue (contrairement aux points de position).
+    developer.log(
+      'tracking: battement de cœur non délivré (réseau)',
+      name: 'mission_resistance.tracking',
+      level: 800,
+      error: e,
+    );
   }
 
   @override
@@ -110,20 +132,41 @@ class HttpPositionReporter implements PositionReporterPort {
           'positions': batch.map((p) => p.toJson()).toList(growable: false),
         }),
       );
+    } on DioException catch (e, st) {
+      // Partie terminée (410) : on jette le lot (rien à rejouer) et on signale
+      // l'arrêt — l'isolate stoppe le service de premier plan.
+      if (e.response?.statusCode == 410) {
+        _notifyPartieFinished();
+        return;
+      }
+      _requeue(batch, e, st);
     } catch (e, st) {
-      // Échec réseau : on remet le lot en tête pour réessayer au prochain
-      // flush (buffer hors-ligne). Le plafond peut ensuite évincer les plus
-      // vieux si la coupure dure.
-      _buffer.insertAll(0, batch);
-      _enforceCap();
-      developer.log(
-        'tracking: échec d\'envoi de ${batch.length} position(s) — réessai différé',
-        name: 'mission_resistance.tracking',
-        level: 900,
-        error: e,
-        stackTrace: st,
-      );
+      _requeue(batch, e, st);
     }
+  }
+
+  /// Échec réseau : on remet le lot en tête pour réessayer au prochain flush
+  /// (buffer hors-ligne). Le plafond peut ensuite évincer les plus vieux.
+  void _requeue(List<GpsPosition> batch, Object e, StackTrace st) {
+    _buffer.insertAll(0, batch);
+    _enforceCap();
+    developer.log(
+      'tracking: échec d\'envoi de ${batch.length} position(s) — réessai différé',
+      name: 'mission_resistance.tracking',
+      level: 900,
+      error: e,
+      stackTrace: st,
+    );
+  }
+
+  /// Bascule en « partie terminée » (idempotent) : stoppe l'envoi, vide la file
+  /// et notifie une seule fois l'isolate.
+  void _notifyPartieFinished() {
+    if (_partieFinished) return;
+    _partieFinished = true;
+    _disposed = true;
+    _buffer.clear();
+    onPartieFinished?.call();
   }
 
   /// Plafonne la file en évinçant les points les plus anciens (en tête).

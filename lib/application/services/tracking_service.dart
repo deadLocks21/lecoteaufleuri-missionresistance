@@ -7,11 +7,12 @@ import '../../infrastructure/telemetry/telemetry_providers.dart';
 import '../../infrastructure/tracking/geolocator_location_tracking.dart';
 import '../../infrastructure/tracking/tracking_config.dart';
 import '../../infrastructure/tracking/tracking_task_handler.dart';
+import '../session/partie_controller.dart';
 import '../session/session_controller.dart';
 
 enum TrackingStatus { idle, active, stopped, denied, expired }
 
-enum TrackingStopReason { manual, scenarioComplete, deadline }
+enum TrackingStopReason { manual, scenarioComplete, deadline, partieEnded }
 
 /// État observable du suivi (pour l'UI / le debug). Le compteur de points est
 /// alimenté par l'isolate d'arrière-plan quand l'app est ouverte.
@@ -59,6 +60,10 @@ class TrackingState {
 class TrackingService extends Notifier<TrackingState> {
   static const int _serviceId = 4509;
 
+  /// Partie pour laquelle le service tourne actuellement (détecte un changement
+  /// de partie → relance avec le nouvel `X-Partie-Id`).
+  String? _activePartieId;
+
   @override
   TrackingState build() {
     _initForegroundTask();
@@ -67,16 +72,21 @@ class TrackingService extends Notifier<TrackingState> {
       () => FlutterForegroundTask.removeTaskDataCallback(_onTaskData),
     );
 
-    // Le suivi suit le cycle de la session : déverrouillage = début de jeu,
-    // reverrouillage (depuis l'app, pas le shake d'un mauvais code) = arrêt.
-    ref.listen<SessionState>(sessionControllerProvider, (prev, next) {
-      if (next is Unlocked) {
+    // Le suivi suit l'état de **partie** : il démarre quand une partie est en
+    // cours (`PartiePlaying`) et s'arrête dès qu'elle se termine / change d'état
+    // (verrouillage, déconnexion). Un **changement d'id** de partie (relance
+    // depuis la régie) relance le service avec le nouvel `X-Partie-Id`.
+    ref.listen<PartieState>(partieControllerProvider, (prev, next) {
+      final prevId = prev is PartiePlaying ? prev.partie.id : null;
+      final nextId = next is PartiePlaying ? next.partie.id : null;
+      if (prevId == nextId) return;
+      if (nextId != null) {
         unawaited(start());
-      } else if (next is Locked && prev is Unlocked) {
-        unawaited(stop(TrackingStopReason.manual));
+      } else {
+        unawaited(stop(TrackingStopReason.partieEnded));
       }
     });
-    if (ref.read(sessionControllerProvider) is Unlocked) {
+    if (ref.read(partieControllerProvider) is PartiePlaying) {
       Future.microtask(start);
     }
 
@@ -84,7 +94,18 @@ class TrackingService extends Notifier<TrackingState> {
   }
 
   Future<void> start() async {
-    if (state.status == TrackingStatus.active) return;
+    final partieId = ref.read(currentPartieIdProvider);
+    // Pas de partie active → rien à suivre (le GPS ne tourne qu'en partie).
+    if (partieId == null) return;
+    // Déjà actif pour cette même partie → rien à faire.
+    if (state.status == TrackingStatus.active && _activePartieId == partieId) {
+      return;
+    }
+    // Partie différente (relance régie) : on coupe le service en cours avant de
+    // relancer avec le nouvel id.
+    if (state.status == TrackingStatus.active) {
+      await _stopService();
+    }
 
     final absolute = trackingConfiguredDeadline();
     if (absolute != null && DateTime.now().isAfter(absolute)) {
@@ -104,6 +125,7 @@ class TrackingService extends Notifier<TrackingState> {
       await _ensureNotificationPermission();
 
       final ok = await _launch(absolute);
+      if (ok) _activePartieId = partieId;
       state = ok
           ? TrackingState(
               status: TrackingStatus.active,
@@ -134,6 +156,18 @@ class TrackingService extends Notifier<TrackingState> {
 
   Future<void> stop(TrackingStopReason reason) async {
     if (state.status == TrackingStatus.stopped) return;
+    await _stopService();
+    _activePartieId = null;
+    state = state.copyWith(
+      status: TrackingStatus.stopped,
+      stopReason: reason,
+    );
+    _log('tracking.stopped', attrs: {'reason': reason.name});
+  }
+
+  /// Arrête le service de premier plan s'il tourne (sans toucher à l'état) —
+  /// partagé par [stop] et la relance sur changement de partie.
+  Future<void> _stopService() async {
     try {
       if (await FlutterForegroundTask.isRunningService) {
         await FlutterForegroundTask.stopService();
@@ -141,11 +175,6 @@ class TrackingService extends Notifier<TrackingState> {
     } catch (e, st) {
       _log('tracking.stop_error', error: e, stack: st);
     }
-    state = state.copyWith(
-      status: TrackingStatus.stopped,
-      stopReason: reason,
-    );
-    _log('tracking.stopped', attrs: {'reason': reason.name});
   }
 
   /// Démarre le service de premier plan avec la config de la partie. La date
@@ -167,6 +196,10 @@ class TrackingService extends Notifier<TrackingState> {
     await FlutterForegroundTask.saveData(
       key: TrackingDataKeys.teamId,
       value: team.id,
+    );
+    await FlutterForegroundTask.saveData(
+      key: TrackingDataKeys.partieId,
+      value: ref.read(currentPartieIdProvider) ?? '',
     );
     await FlutterForegroundTask.saveData(
       key: TrackingDataKeys.deadlineMillis,
@@ -208,14 +241,22 @@ class TrackingService extends Notifier<TrackingState> {
   }
 
   void _onTaskData(Object data) {
-    if (data is Map && data['event'] == 'fix') {
-      final ts = data['ts'];
-      state = state.copyWith(
-        fixCount: state.fixCount + 1,
-        lastFixAt: ts is int
-            ? DateTime.fromMillisecondsSinceEpoch(ts)
-            : state.lastFixAt,
-      );
+    if (data is! Map) return;
+    switch (data['event']) {
+      case 'fix':
+        final ts = data['ts'];
+        state = state.copyWith(
+          fixCount: state.fixCount + 1,
+          lastFixAt: ts is int
+              ? DateTime.fromMillisecondsSinceEpoch(ts)
+              : state.lastFixAt,
+        );
+      case 'partie_ended':
+        // L'isolate a reçu un `410` : la partie est terminée. On reflète l'arrêt
+        // et on demande au contrôleur de partie de réconcilier (→ « terminée »,
+        // ou « en jeu » si la régie a relancé une nouvelle partie).
+        unawaited(stop(TrackingStopReason.partieEnded));
+        unawaited(ref.read(partieControllerProvider.notifier).refresh());
     }
   }
 

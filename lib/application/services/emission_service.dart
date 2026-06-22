@@ -11,6 +11,7 @@ import '../../infrastructure/http/api_config.dart';
 import '../../infrastructure/memory/in_memory_outbox.dart';
 import '../../infrastructure/radio/http_outbox.dart';
 import '../config/timings.dart';
+import '../session/partie_controller.dart';
 import '../session/session_controller.dart';
 import 'inbox_service.dart';
 
@@ -142,5 +143,9 @@ final outboxPortProvider = Provider<OutboxPort>((ref) {
   if (kApiBaseUrl.isEmpty) return InMemoryOutbox();
   final Team team =
       ref.watch(currentTeamProvider) ?? ref.watch(demoTeamProvider);
-  return HttpOutbox(baseUrl: kApiBaseUrl, teamId: team.id);
+  return HttpOutbox(
+    baseUrl: kApiBaseUrl,
+    teamId: team.id,
+    partieId: ref.watch(currentPartieIdProvider),
+  );
 });

@@ -84,10 +84,17 @@ class SessionController extends Notifier<SessionState> {
     }
 
     try {
-      final team = await ref.read(authPortProvider).unlock(code);
-      // Mémorise code + identité d'équipe pour la reconnexion automatique.
+      final result = await ref.read(authPortProvider).unlock(code);
+      final team = result.team;
+      // Mémorise code + identité d'équipe + dernière partie connue (amorce de
+      // l'en-tête X-Partie-Id) pour la reconnexion automatique.
       await ref.read(sessionStoreProvider).save(
-            StoredSession(code: code.value, teamId: team.id, teamName: team.name),
+            StoredSession(
+              code: code.value,
+              teamId: team.id,
+              teamName: team.name,
+              partieId: result.partie?.id,
+            ),
           );
       state = Unlocking(team);
       await Future<void>.delayed(Timings.unlock);

@@ -23,7 +23,12 @@ class SharedPrefsSessionStore implements SessionStore {
       if (code is! String || teamId is! String || teamName is! String) {
         return null;
       }
-      return StoredSession(code: code, teamId: teamId, teamName: teamName);
+      return StoredSession(
+        code: code,
+        teamId: teamId,
+        teamName: teamName,
+        partieId: map['partieId'] as String?,
+      );
     } catch (_) {
       // Donnée corrompue : on repart d'un écran de code propre.
       return null;
@@ -39,6 +44,7 @@ class SharedPrefsSessionStore implements SessionStore {
         'code': session.code,
         'teamId': session.teamId,
         'teamName': session.teamName,
+        if (session.partieId != null) 'partieId': session.partieId,
       }),
     );
   }

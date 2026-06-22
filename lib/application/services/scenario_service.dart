@@ -13,6 +13,7 @@ import '../../infrastructure/memory/in_memory_scenario.dart';
 import '../../infrastructure/scenario/cached_scenario.dart';
 import '../../infrastructure/scenario/disk_progress_store.dart';
 import '../../infrastructure/scenario/http_scenario.dart';
+import '../session/partie_controller.dart';
 import '../session/session_controller.dart';
 
 /// Scénario + progression à un instant donné.
@@ -135,13 +136,22 @@ final scenarioPortProvider = Provider<ScenarioPort>((ref) {
   return CachedScenario(HttpScenario(baseUrl: kApiBaseUrl));
 });
 
-/// Progression : backend + équipe connue → [DiskProgressStore] (prefs locales +
-/// push réseau bufferisé, clé = `team.id`) ; sinon jumeau en mémoire. Rebascule
-/// au déverrouillage (dépend de [currentTeamProvider]).
+/// Progression : backend + équipe **et partie** connues → [DiskProgressStore]
+/// (prefs locales + push réseau bufferisé, scope `(team, partie)`) ; sinon
+/// jumeau en mémoire. Rebascule au déverrouillage (dépend de
+/// [currentTeamProvider]) **et à chaque changement de partie**
+/// ([currentPartieIdProvider]) → ardoise vierge à la nouvelle partie.
 final progressStoreProvider = Provider<ProgressStore>((ref) {
   final team = ref.watch(currentTeamProvider);
-  if (kApiBaseUrl.isEmpty || team == null) return InMemoryProgressStore();
-  return DiskProgressStore(teamId: team.id, baseUrl: kApiBaseUrl);
+  final partieId = ref.watch(currentPartieIdProvider);
+  if (kApiBaseUrl.isEmpty || team == null || partieId == null) {
+    return InMemoryProgressStore();
+  }
+  return DiskProgressStore(
+    teamId: team.id,
+    partieId: partieId,
+    baseUrl: kApiBaseUrl,
+  );
 });
 
 final scenarioServiceProvider =

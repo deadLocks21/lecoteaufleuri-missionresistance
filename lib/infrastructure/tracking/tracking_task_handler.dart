@@ -53,6 +53,11 @@ class TrackingTaskHandler extends TaskHandler {
           key: TrackingDataKeys.teamId,
         ) ??
         'unknown';
+    final rawPartieId = await FlutterForegroundTask.getData<String>(
+      key: TrackingDataKeys.partieId,
+    );
+    final partieId =
+        (rawPartieId == null || rawPartieId.isEmpty) ? null : rawPartieId;
     _deadlineMillis = await FlutterForegroundTask.getData<int>(
           key: TrackingDataKeys.deadlineMillis,
         ) ??
@@ -62,7 +67,12 @@ class TrackingTaskHandler extends TaskHandler {
         GeolocatorLocationTracking(distanceFilterMeters: kDistanceFilterMeters);
     _reporter = kApiBaseUrl.isEmpty
         ? InMemoryPositionReporter()
-        : HttpPositionReporter(baseUrl: kApiBaseUrl, teamId: teamId);
+        : HttpPositionReporter(
+            baseUrl: kApiBaseUrl,
+            teamId: teamId,
+            partieId: partieId,
+            onPartieFinished: _onPartieFinished,
+          );
 
     // La permission a été accordée côté UI avant le démarrage du service.
     try {
@@ -93,18 +103,19 @@ class TrackingTaskHandler extends TaskHandler {
       );
     }
 
-    await _startRadioWatch(teamId);
+    await _startRadioWatch(teamId, partieId);
   }
 
   /// Démarre la veille radio : `fetch()` **amorce** le set des ids déjà vus pour
   /// ne pas notifier le backlog existant, puis le flux `incoming()` (sondage
   /// ~8 s) émet les nouveaux messages → notification (reçus uniquement) + push à
   /// l'UI. Sans backend (démo) : pas de service de fond → rien à faire ici.
-  Future<void> _startRadioWatch(String teamId) async {
+  Future<void> _startRadioWatch(String teamId, String? partieId) async {
     if (kApiBaseUrl.isEmpty) return;
     try {
       _notifier = LocalNotifier();
-      final inbox = HttpInbox(baseUrl: kApiBaseUrl, teamId: teamId);
+      final inbox =
+          HttpInbox(baseUrl: kApiBaseUrl, teamId: teamId, partieId: partieId);
       _inbox = inbox;
       // Amorçage best-effort : en cas d'échec réseau, le 1er sondage (dans ~8 s)
       // rejouera la liste ; le serveur plafonne à 50 messages, donc pas de
@@ -145,6 +156,15 @@ class TrackingTaskHandler extends TaskHandler {
             Future<void>.value(),
       );
     }
+  }
+
+  /// Partie terminée (le backend a renvoyé `410`) : on prévient l'isolate UI
+  /// (qui reflète « partie terminée ») et on arrête le service de premier plan.
+  void _onPartieFinished() {
+    FlutterForegroundTask.sendDataToMain(<String, Object>{
+      'event': 'partie_ended',
+    });
+    unawaited(FlutterForegroundTask.stopService());
   }
 
   @override

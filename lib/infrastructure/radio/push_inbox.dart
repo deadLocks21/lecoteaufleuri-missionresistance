@@ -19,8 +19,8 @@ import 'radio_json.dart';
 ///   sur le canal `TaskData`. L'app au premier plan se met ainsi à jour en live
 ///   sans dupliquer le poll de fond.
 class PushInbox implements InboxPort {
-  PushInbox({required String baseUrl, required String teamId})
-      : _http = HttpInbox(baseUrl: baseUrl, teamId: teamId);
+  PushInbox({required String baseUrl, required String teamId, String? partieId})
+      : _http = HttpInbox(baseUrl: baseUrl, teamId: teamId, partieId: partieId);
 
   final HttpInbox _http;
 

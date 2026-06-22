@@ -13,8 +13,12 @@ import 'radio_json.dart';
 /// `duration_ms`). Le backend persiste l'audio sur kDrive et l'indexe dans le
 /// groupe de l'équipe. Le fichier temporaire local est supprimé après l'envoi.
 class HttpOutbox implements OutboxPort {
-  HttpOutbox({required String baseUrl, required this.teamId, Dio? dio})
-      : _base = _trimTrailingSlash(baseUrl),
+  HttpOutbox({
+    required String baseUrl,
+    required this.teamId,
+    this.partieId,
+    Dio? dio,
+  })  : _base = _trimTrailingSlash(baseUrl),
         _dio = dio ??
             Dio(
               BaseOptions(
@@ -22,12 +26,16 @@ class HttpOutbox implements OutboxPort {
                 connectTimeout: const Duration(seconds: 8),
                 sendTimeout: const Duration(seconds: 30),
                 receiveTimeout: const Duration(seconds: 30),
+                headers: partieId == null ? null : {'X-Partie-Id': partieId},
               ),
             );
 
   final Dio _dio;
   final String _base;
   final String teamId;
+
+  /// Partie courante (scope serveur de l'émission). `null` = aucune partie.
+  final String? partieId;
 
   String get _audioBase => '$_base/sessions/$teamId/radio';
 

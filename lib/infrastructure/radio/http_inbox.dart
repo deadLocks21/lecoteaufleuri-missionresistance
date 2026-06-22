@@ -15,8 +15,12 @@ import 'radio_json.dart';
 /// assurées **côté serveur** ; l'app affiche la liste telle quelle (récent →
 /// ancien).
 class HttpInbox implements InboxPort {
-  HttpInbox({required String baseUrl, required this.teamId, Dio? dio})
-      : _base = _trimTrailingSlash(baseUrl),
+  HttpInbox({
+    required String baseUrl,
+    required this.teamId,
+    this.partieId,
+    Dio? dio,
+  })  : _base = _trimTrailingSlash(baseUrl),
         _heard = HeardStore(teamId),
         _dio = dio ??
             Dio(
@@ -25,6 +29,7 @@ class HttpInbox implements InboxPort {
                 connectTimeout: const Duration(seconds: 8),
                 receiveTimeout: const Duration(seconds: 8),
                 contentType: 'application/json',
+                headers: partieId == null ? null : {'X-Partie-Id': partieId},
               ),
             );
 
@@ -34,6 +39,9 @@ class HttpInbox implements InboxPort {
 
   /// Statut « lu » persisté localement (durable entre deux lancements).
   final HeardStore _heard;
+
+  /// Partie courante (scope serveur des messages). `null` = aucune partie.
+  final String? partieId;
 
   /// Ids déjà vus (semés par [fetch], enrichis par le polling) → on ne re-pousse
   /// pas un message déjà présent dans la boîte.

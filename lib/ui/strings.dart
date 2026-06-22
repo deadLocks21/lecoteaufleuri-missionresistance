@@ -99,6 +99,16 @@ abstract final class Strings {
   static const cancel = 'Annuler';
   static const decipher = 'Déchiffrer';
 
+  // Partie — en attente / terminée (pilotées par la régie)
+  static const partieWaitingTitle = 'En attente de partie';
+  static const partieWaitingBody =
+      "Le QG n'a pas encore lancé la partie.\n"
+      'Le poste se mettra en service dès qu\'elle démarrera.';
+  static const partieEndedTitle = 'Partie terminée';
+  static const partieEndedBody =
+      'Le QG a mis fin à la partie. Le suivi est arrêté.\n'
+      'Patiente : une nouvelle partie peut être lancée.';
+
   // Accessibilité
   static const a11yTitle = 'Poste radio TSF — application de jeu';
 }

@@ -30,6 +30,9 @@ const Duration kSafetyMaxDuration = Duration(hours: 4);
 abstract final class TrackingDataKeys {
   static const String teamId = 'tracking.teamId';
 
+  /// Partie active (envoyée dans l'en-tête `X-Partie-Id`). Vide = aucune.
+  static const String partieId = 'tracking.partieId';
+
   /// Date limite effective (epoch ms) ; `0` = aucune.
   static const String deadlineMillis = 'tracking.deadlineMillis';
 }

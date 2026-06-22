@@ -40,6 +40,9 @@ abstract final class Timings {
   /// Clignotement du curseur du bandeau LCD.
   static const blink = Duration(seconds: 1);
 
+  /// Sondage de l'état de partie (début/fin) — aligné sur le suivi régie (~10 s).
+  static const partiePoll = Duration(seconds: 10);
+
   /// Retour au texte par défaut du bandeau après un message transitoire.
   static const tickerRevert = Duration(milliseconds: 1800);
 

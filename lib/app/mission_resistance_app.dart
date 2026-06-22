@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../application/services/inbox_service.dart';
 import '../application/services/tracking_service.dart';
+import '../application/session/partie_controller.dart';
 import '../application/session/session_controller.dart';
 import '../infrastructure/telemetry/telemetry_providers.dart';
 import '../ui/features/lock/lock_screen.dart';
+import '../ui/features/partie/partie_status_screen.dart';
 import '../ui/features/shell/radio_shell.dart';
 import '../ui/strings.dart';
 import '../ui/theme/app_colors.dart';
@@ -30,8 +32,10 @@ class _MissionResistanceAppState extends ConsumerState<MissionResistanceApp>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // Instancie le service de suivi dès le départ pour que son écoute de la
-    // session (démarrage au déverrouillage) soit branchée avant l'unlock.
+    // Instancie le contrôleur de partie **et** le service de suivi dès le départ
+    // pour que leurs écoutes (poll de partie ; démarrage du GPS quand une partie
+    // est en cours) soient branchées avant l'unlock.
+    ref.read(partieControllerProvider.notifier);
     ref.read(trackingServiceProvider.notifier);
   }
 
@@ -85,11 +89,12 @@ class _SessionGate extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // `Restoring` (reconnexion auto) → splash ; `Unlocked` → shell ; sinon code.
+    // `Restoring` (reconnexion auto) → splash ; `Unlocked` → selon la **partie**
+    // (en jeu → shell ; en attente / terminée → écran de statut) ; sinon code.
     // La transition de déverrouillage (`Unlocking`) reste sur l'écran de code.
     final session = ref.watch(sessionControllerProvider);
     final Widget child = switch (session) {
-      Unlocked() => const RadioShell(key: ValueKey('shell')),
+      Unlocked() => _unlockedChild(ref),
       Restoring() => const _StartupSplash(key: ValueKey('splash')),
       _ => const LockScreen(key: ValueKey('lock')),
     };
@@ -104,6 +109,18 @@ class _SessionGate extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  /// Déverrouillé : l'accès au jeu dépend de l'état de **partie** (la régie la
+  /// démarre/arrête). En jeu → shell ; sinon écran de statut (en attente /
+  /// terminée), le poste sondant le serveur en fond pour (re)basculer.
+  Widget _unlockedChild(WidgetRef ref) {
+    final partie = ref.watch(partieControllerProvider);
+    return switch (partie) {
+      PartiePlaying() => const RadioShell(key: ValueKey('shell')),
+      PartieOver() => const PartieStatusScreen.ended(key: ValueKey('partie-ended')),
+      _ => const PartieStatusScreen.waiting(key: ValueKey('partie-waiting')),
+    };
   }
 }
 

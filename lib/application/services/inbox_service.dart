@@ -11,6 +11,7 @@ import '../../infrastructure/http/api_config.dart';
 import '../../infrastructure/memory/in_memory_inbox.dart';
 import '../../infrastructure/radio/push_inbox.dart';
 import '../config/timings.dart';
+import '../session/partie_controller.dart';
 import '../session/session_controller.dart';
 
 /// Charge et pilote la boîte de réception (BRIEF §8.2 / ARCHITECTURE §10).
@@ -116,5 +117,9 @@ final inboxPortProvider = Provider<InboxPort>((ref) {
   if (kApiBaseUrl.isEmpty) return InMemoryInbox();
   final Team team =
       ref.watch(currentTeamProvider) ?? ref.watch(demoTeamProvider);
-  return PushInbox(baseUrl: kApiBaseUrl, teamId: team.id);
+  return PushInbox(
+    baseUrl: kApiBaseUrl,
+    teamId: team.id,
+    partieId: ref.watch(currentPartieIdProvider),
+  );
 });
