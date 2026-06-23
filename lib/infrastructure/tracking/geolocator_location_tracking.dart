@@ -107,7 +107,7 @@ class GeolocatorLocationTracking implements LocationTrackingPort {
           allowBackgroundLocationUpdates: true,
           pauseLocationUpdatesAutomatically: false,
           showBackgroundLocationIndicator: true,
-          activityType: ActivityType.fitness,
+          activityType: ActivityType.other,
         );
       default:
         return LocationSettings(
