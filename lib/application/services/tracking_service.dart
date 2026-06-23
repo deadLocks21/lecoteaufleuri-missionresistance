@@ -1,10 +1,13 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../infrastructure/http/api_config.dart';
 import '../../infrastructure/telemetry/telemetry_providers.dart';
 import '../../infrastructure/tracking/geolocator_location_tracking.dart';
+import '../../infrastructure/tracking/http_position_reporter.dart';
 import '../../infrastructure/tracking/tracking_config.dart';
 import '../../infrastructure/tracking/tracking_task_handler.dart';
 import '../session/partie_controller.dart';
@@ -63,6 +66,16 @@ class TrackingService extends Notifier<TrackingState> {
   /// Partie pour laquelle le service tourne actuellement (détecte un changement
   /// de partie → relance avec le nouvel `X-Partie-Id`).
   String? _activePartieId;
+
+  // ── iOS uniquement ───────────────────────────────────────────────────────
+  // CoreLocation ne fonctionne pas dans l'isolate d'arrière-plan de
+  // flutter_foreground_task. On fait donc tourner le GPS et l'envoi HTTP
+  // directement dans l'isolate UI (qui reste vivant grâce au background mode
+  // `location` de l'Info.plist).
+  GeolocatorLocationTracking? _iosTracker;
+  HttpPositionReporter? _iosReporter;
+  StreamSubscription<dynamic>? _iosSub;
+  Timer? _iosHeartbeatTimer;
 
   @override
   TrackingState build() {
@@ -168,6 +181,9 @@ class TrackingService extends Notifier<TrackingState> {
   /// Arrête le service de premier plan s'il tourne (sans toucher à l'état) —
   /// partagé par [stop] et la relance sur changement de partie.
   Future<void> _stopService() async {
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      await _stopIosTracking();
+    }
     try {
       if (await FlutterForegroundTask.isRunningService) {
         await FlutterForegroundTask.stopService();
@@ -205,6 +221,10 @@ class TrackingService extends Notifier<TrackingState> {
       key: TrackingDataKeys.deadlineMillis,
       value: effective.millisecondsSinceEpoch,
     );
+    await FlutterForegroundTask.saveData(
+      key: TrackingDataKeys.isIos,
+      value: defaultTargetPlatform == TargetPlatform.iOS,
+    );
 
     final result = await FlutterForegroundTask.startService(
       serviceId: _serviceId,
@@ -214,12 +234,73 @@ class TrackingService extends Notifier<TrackingState> {
       callback: startTrackingCallback,
     );
     if (result is ServiceRequestFailure) {
-      // On remonte la raison réelle du refus de l'OS (permission notif, type de
-      // service interdit en arrière-plan, localisation coupée…) plutôt que de la
-      // perdre derrière un `start_failed` générique.
       _log('tracking.launch_rejected', error: result.error);
     }
-    return result is ServiceRequestSuccess;
+    final ok = result is ServiceRequestSuccess;
+    if (ok && defaultTargetPlatform == TargetPlatform.iOS) {
+      await _startIosTracking(team.id, ref.read(currentPartieIdProvider), effective);
+    }
+    return ok;
+  }
+
+  // ── iOS : GPS + envoi HTTP dans l'isolate UI ─────────────────────────────
+
+  Future<void> _startIosTracking(
+    String teamId,
+    String? partieId,
+    DateTime deadline,
+  ) async {
+    _iosTracker =
+        GeolocatorLocationTracking(distanceFilterMeters: kDistanceFilterMeters);
+    if (kApiBaseUrl.isNotEmpty) {
+      _iosReporter = HttpPositionReporter(
+        baseUrl: kApiBaseUrl,
+        teamId: teamId,
+        partieId: partieId,
+        onPartieFinished: _onIosPartieFinished,
+      );
+    }
+    _iosSub = _iosTracker!.positions().listen(
+      (pos) {
+        _iosReporter?.report(pos);
+        state = state.copyWith(
+          fixCount: state.fixCount + 1,
+          lastFixAt: pos.timestamp,
+        );
+      },
+      onError: (Object e, StackTrace st) =>
+          _log('tracking.ios_gps_error', error: e, stack: st),
+    );
+    _iosHeartbeatTimer =
+        Timer.periodic(kHeartbeatInterval, (_) => _iosHeartbeat(deadline));
+    _log('tracking.ios_gps_started');
+  }
+
+  Future<void> _stopIosTracking() async {
+    _iosHeartbeatTimer?.cancel();
+    _iosHeartbeatTimer = null;
+    await _iosSub?.cancel();
+    _iosSub = null;
+    await _iosReporter?.dispose();
+    _iosReporter = null;
+    final tracker = _iosTracker;
+    if (tracker != null) {
+      await tracker.dispose();
+      _iosTracker = null;
+    }
+  }
+
+  void _iosHeartbeat(DateTime deadline) {
+    if (DateTime.now().isAfter(deadline)) {
+      unawaited(stop(TrackingStopReason.deadline));
+      return;
+    }
+    unawaited(_iosReporter?.heartbeat());
+  }
+
+  void _onIosPartieFinished() {
+    unawaited(stop(TrackingStopReason.partieEnded));
+    unawaited(ref.read(partieControllerProvider.notifier).refresh());
   }
 
   void _initForegroundTask() {

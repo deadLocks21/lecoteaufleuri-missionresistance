@@ -41,6 +41,11 @@ class TrackingTaskHandler extends TaskHandler {
   bool _hasFix = false;
   int _deadlineMillis = 0;
 
+  // Sur iOS, le GPS et le heartbeat tournent dans l'isolate UI (CoreLocation
+  // n'émet pas depuis un isolate d'arrière-plan). Cet handler ne gère alors
+  // que la veille radio et les notifications.
+  bool _isIos = false;
+
   // Radio : ce handler est le **seul poller** des messages pendant la partie.
   // Il notifie (messages reçus) et pousse tout nouveau message à l'UI.
   HttpInbox? _inbox;
@@ -62,45 +67,49 @@ class TrackingTaskHandler extends TaskHandler {
           key: TrackingDataKeys.deadlineMillis,
         ) ??
         0;
+    _isIos = await FlutterForegroundTask.getData<bool>(
+          key: TrackingDataKeys.isIos,
+        ) ??
+        false;
 
-    _tracker =
-        GeolocatorLocationTracking(distanceFilterMeters: kDistanceFilterMeters);
-    _reporter = kApiBaseUrl.isEmpty
-        ? InMemoryPositionReporter()
-        : HttpPositionReporter(
-            baseUrl: kApiBaseUrl,
-            teamId: teamId,
-            partieId: partieId,
-            onPartieFinished: _onPartieFinished,
-          );
-
-    // La permission a été accordée côté UI avant le démarrage du service.
-    try {
-      _sub = _tracker!.positions().listen(
-        (pos) {
-          _hasFix = true;
-          _lastReportAt = DateTime.now();
-          _reporter!.report(pos);
-          // Remonte à l'UI (rafraîchit le compteur quand l'app est ouverte).
-          FlutterForegroundTask.sendDataToMain(<String, Object>{
-            'event': 'fix',
-            'ts': pos.timestamp.millisecondsSinceEpoch,
-          });
-        },
-        onError: (Object e, StackTrace st) => developer.log(
-          'tracking(bg): erreur de flux',
+    if (!_isIos) {
+      // Android : GPS et envoi HTTP dans cet isolate d'arrière-plan.
+      _tracker = GeolocatorLocationTracking(
+          distanceFilterMeters: kDistanceFilterMeters);
+      _reporter = kApiBaseUrl.isEmpty
+          ? InMemoryPositionReporter()
+          : HttpPositionReporter(
+              baseUrl: kApiBaseUrl,
+              teamId: teamId,
+              partieId: partieId,
+              onPartieFinished: _onPartieFinished,
+            );
+      try {
+        _sub = _tracker!.positions().listen(
+          (pos) {
+            _hasFix = true;
+            _lastReportAt = DateTime.now();
+            _reporter!.report(pos);
+            FlutterForegroundTask.sendDataToMain(<String, Object>{
+              'event': 'fix',
+              'ts': pos.timestamp.millisecondsSinceEpoch,
+            });
+          },
+          onError: (Object e, StackTrace st) => developer.log(
+            'tracking(bg): erreur de flux',
+            name: 'mission_resistance.tracking',
+            error: e,
+            stackTrace: st,
+          ),
+        );
+      } catch (e, st) {
+        developer.log(
+          'tracking(bg): démarrage du flux impossible',
           name: 'mission_resistance.tracking',
           error: e,
           stackTrace: st,
-        ),
-      );
-    } catch (e, st) {
-      developer.log(
-        'tracking(bg): démarrage du flux impossible',
-        name: 'mission_resistance.tracking',
-        error: e,
-        stackTrace: st,
-      );
+        );
+      }
     }
 
     await _startRadioWatch(teamId, partieId);
@@ -183,6 +192,9 @@ class TrackingTaskHandler extends TaskHandler {
   void onRepeatEvent(DateTime timestamp) => unawaited(_tick());
 
   Future<void> _tick() async {
+    // Sur iOS, le heartbeat et la deadline sont gérés dans l'isolate UI.
+    if (_isIos) return;
+
     // 2ᵉ sécurité d'arrêt : date limite (vérifiée même app fermée).
     if (_deadlineMillis > 0 &&
         DateTime.now().millisecondsSinceEpoch >= _deadlineMillis) {

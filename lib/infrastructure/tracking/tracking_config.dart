@@ -35,4 +35,8 @@ abstract final class TrackingDataKeys {
 
   /// Date limite effective (epoch ms) ; `0` = aucune.
   static const String deadlineMillis = 'tracking.deadlineMillis';
+
+  /// `true` sur iOS : le GPS tourne dans l'isolate UI (CoreLocation ne
+  /// fonctionne pas dans l'isolate d'arrière-plan de flutter_foreground_task).
+  static const String isIos = 'tracking.isIos';
 }
