@@ -93,6 +93,9 @@ jobs:
       PACKAGE_NAME: "com.lecoteaufleuri.missionresistance"
       GCLOUD_SERVICE_ACCOUNT_CREDENTIALS: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_CREDENTIALS }}
       VERSION: ${{ needs.prepare.outputs.version }}
+      # URL du backend injectée au build (cf. infrastructure/http/api_config.dart).
+      # VIDE → l'app sert le jumeau de démo (InMemory*), aucun appel réseau.
+      API_BASE_URL: ${{ secrets.API_BASE_URL }}
       # Télémétrie Signoz injectée au build via --dart-define (cf.
       # infrastructure/telemetry/telemetry_providers.dart). Sans
       # SIGNOZ_INGEST_URL, l'app retombe sur le logger console (Signoz off).
@@ -161,6 +164,7 @@ jobs:
           flutter build appbundle --release \
             --build-name="$VERSION" \
             --build-number="${{ steps.build-number.outputs.build_number }}" \
+            --dart-define=API_BASE_URL="$API_BASE_URL" \
             --dart-define=APP_VERSION="$VERSION+${{ steps.build-number.outputs.build_number }}" \
             --dart-define=SIGNOZ_INGEST_URL="$SIGNOZ_INGEST_URL" \
             --dart-define=SIGNOZ_INGESTION_KEY="$SIGNOZ_INGESTION_KEY" \
@@ -174,6 +178,7 @@ jobs:
           flutter build apk --release \
             --build-name="$VERSION" \
             --build-number="${{ steps.build-number.outputs.build_number }}" \
+            --dart-define=API_BASE_URL="$API_BASE_URL" \
             --dart-define=APP_VERSION="$VERSION+${{ steps.build-number.outputs.build_number }}" \
             --dart-define=SIGNOZ_INGEST_URL="$SIGNOZ_INGEST_URL" \
             --dart-define=SIGNOZ_INGESTION_KEY="$SIGNOZ_INGESTION_KEY" \
@@ -207,6 +212,8 @@ jobs:
       BUNDLE_ID: "com.lecoteaufleuri.missionresistance"
       APP_STORE_APPLE_ID: ${{ vars.APP_STORE_APPLE_ID }}
       VERSION: ${{ needs.prepare.outputs.version }}
+      # URL du backend injectée au build (cf. job Android). VIDE → jumeau démo.
+      API_BASE_URL: ${{ secrets.API_BASE_URL }}
       # Télémétrie Signoz injectée au build via --dart-define (cf. job Android).
       SIGNOZ_INGEST_URL: ${{ secrets.SIGNOZ_INGEST_URL }}
       SIGNOZ_INGESTION_KEY: ${{ secrets.SIGNOZ_INGESTION_KEY }}
@@ -287,6 +294,7 @@ jobs:
             --build-name="$VERSION" \
             --build-number="${{ steps.build-number.outputs.build_number }}" \
             --export-options-plist="$HOME/export_options.plist" \
+            --dart-define=API_BASE_URL="$API_BASE_URL" \
             --dart-define=APP_VERSION="$VERSION+${{ steps.build-number.outputs.build_number }}" \
             --dart-define=SIGNOZ_INGEST_URL="$SIGNOZ_INGEST_URL" \
             --dart-define=SIGNOZ_INGESTION_KEY="$SIGNOZ_INGESTION_KEY" \
