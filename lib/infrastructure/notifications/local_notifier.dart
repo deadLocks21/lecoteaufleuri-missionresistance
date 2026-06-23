@@ -64,7 +64,11 @@ class LocalNotifier {
         priority: Priority.high,
         category: AndroidNotificationCategory.message,
       ),
-      iOS: DarwinNotificationDetails(),
+      iOS: DarwinNotificationDetails(
+        presentAlert: true,
+        presentSound: true,
+        presentBadge: false,
+      ),
     );
     await _plugin.show(
       id: messageId.hashCode & 0x7fffffff,
@@ -88,7 +92,11 @@ class LocalNotifier {
         priority: Priority.high,
         category: AndroidNotificationCategory.status,
       ),
-      iOS: DarwinNotificationDetails(),
+      iOS: DarwinNotificationDetails(
+        presentAlert: true,
+        presentSound: true,
+        presentBadge: false,
+      ),
     );
     await _plugin.show(
       id: _partieEndedNotifId,
