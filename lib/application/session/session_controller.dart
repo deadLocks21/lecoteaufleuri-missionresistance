@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/entities/team.dart';
@@ -100,6 +102,10 @@ class SessionController extends Notifier<SessionState> {
       await Future<void>.delayed(Timings.unlock);
       if (state is Unlocking) {
         state = Unlocked(team);
+        // Demande groupée des permissions dès l'entrée dans l'app (et pas en
+        // pleine partie). Fire-and-forget best-effort : n'interrompt pas le
+        // déverrouillage et un refus ne bloque pas l'accès.
+        unawaited(ref.read(startupPermissionsProvider).requestAll());
       }
     } on InvalidCodeException {
       state = const Locked(error: LockError.invalidCode);

@@ -16,6 +16,7 @@ import 'memory/in_memory_auth.dart';
 import 'memory/in_memory_partie.dart';
 import 'mic/mic_emission.dart';
 import 'partie/http_partie.dart';
+import 'permissions/startup_permissions.dart';
 import 'persistence/shared_prefs_session_store.dart';
 
 /// Câblage **ports → adapters** (inversion de dépendances, ARCHITECTURE §6.5).
@@ -89,3 +90,8 @@ final dialerPortProvider = Provider<DialerPort>((ref) {
   final config = ref.watch(configProvider);
   return UrlLauncherDialer(config.telQg);
 });
+
+/// Demande groupée des permissions au déverrouillage (localisation, micro,
+/// notifications). Surchargeable en test pour neutraliser les dialogues natifs.
+final startupPermissionsProvider =
+    Provider<StartupPermissions>((ref) => const StartupPermissions());
