@@ -94,10 +94,16 @@ class PartieController extends Notifier<PartieState> {
       // a changé — les providers scopés à la partie se reconstruisent).
       state = PartiePlaying(partie);
     } else {
-      final prev = state;
-      state = prev is PartiePlaying
-          ? PartieOver(prev.partie)
-          : const PartieWaiting();
+      // Pas de partie côté serveur. On distingue trois cas :
+      // - on jouait → la partie vient de se terminer (écran de fin) ;
+      // - on affichait déjà la fin → **terminal**, on y reste (sinon le poll
+      //   suivant retomberait en « en attente » et masquerait l'écran de fin) ;
+      // - sinon → aucune partie n'a encore démarré (« en attente »).
+      state = switch (state) {
+        PartiePlaying(:final partie) => PartieOver(partie),
+        PartieOver() => state,
+        _ => const PartieWaiting(),
+      };
     }
   }
 

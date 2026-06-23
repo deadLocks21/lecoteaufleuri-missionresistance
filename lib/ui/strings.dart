@@ -106,8 +106,14 @@ abstract final class Strings {
       'Le poste se mettra en service dès qu\'elle démarrera.';
   static const partieEndedTitle = 'Partie terminée';
   static const partieEndedBody =
-      'Le QG a mis fin à la partie. Le suivi est arrêté.\n'
-      'Patiente : une nouvelle partie peut être lancée.';
+      'Le QG a mis fin à la partie. Le suivi de position est arrêté.\n'
+      "Merci d'avoir participé — le poste va être remis en veille.";
+  static const partieEndedAction = 'Retour à la connexion';
+
+  // Notification locale de fin de partie (postée par l'isolate de suivi).
+  static const partieEndedNotifTitle = 'Partie terminée';
+  static const partieEndedNotifBody =
+      'Le QG a mis fin à la partie. Reviens au poste.';
 
   // Accessibilité
   static const a11yTitle = 'Poste radio TSF — application de jeu';

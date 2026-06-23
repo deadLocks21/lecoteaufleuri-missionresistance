@@ -112,13 +112,14 @@ class _SessionGate extends ConsumerWidget {
   }
 
   /// Déverrouillé : l'accès au jeu dépend de l'état de **partie** (la régie la
-  /// démarre/arrête). En jeu → shell ; sinon écran de statut (en attente /
-  /// terminée), le poste sondant le serveur en fond pour (re)basculer.
+  /// démarre/arrête). En jeu → shell ; en attente → écran de statut (sonde le
+  /// serveur en fond pour basculer en jeu) ; terminée → écran de fin (terminal,
+  /// renvoie à l'écran de connexion via un bouton).
   Widget _unlockedChild(WidgetRef ref) {
     final partie = ref.watch(partieControllerProvider);
     return switch (partie) {
       PartiePlaying() => const RadioShell(key: ValueKey('shell')),
-      PartieOver() => const PartieStatusScreen.ended(key: ValueKey('partie-ended')),
+      PartieOver() => const PartieEndedScreen(key: ValueKey('partie-ended')),
       _ => const PartieStatusScreen.waiting(key: ValueKey('partie-waiting')),
     };
   }

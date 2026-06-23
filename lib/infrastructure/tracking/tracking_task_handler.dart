@@ -159,12 +159,24 @@ class TrackingTaskHandler extends TaskHandler {
   }
 
   /// Partie terminée (le backend a renvoyé `410`) : on prévient l'isolate UI
-  /// (qui reflète « partie terminée ») et on arrête le service de premier plan.
+  /// (qui reflète « partie terminée »), on poste une notification locale pour
+  /// ramener le joueur, puis on arrête le service de premier plan.
   void _onPartieFinished() {
     FlutterForegroundTask.sendDataToMain(<String, Object>{
       'event': 'partie_ended',
     });
-    unawaited(FlutterForegroundTask.stopService());
+    unawaited(_notifyEndedThenStop());
+  }
+
+  /// Notifie la fin de partie **avant** de couper le service (sinon l'isolate
+  /// peut être tué avant que la notification ne parte).
+  Future<void> _notifyEndedThenStop() async {
+    try {
+      await (_notifier ??= LocalNotifier()).showPartieEnded();
+    } catch (_) {
+      // Notification best-effort : on arrête le service quoi qu'il arrive.
+    }
+    await FlutterForegroundTask.stopService();
   }
 
   @override

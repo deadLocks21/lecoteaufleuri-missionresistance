@@ -1,5 +1,7 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+import '../../ui/strings.dart';
+
 /// Poste les notifications locales « nouveau message radio ».
 ///
 /// Conçu pour tourner dans l'**isolate d'arrière-plan** du suivi (le seul poller
@@ -18,6 +20,14 @@ class LocalNotifier {
   static const String _channelName = 'Messages radio';
   static const String _channelDescription =
       'Alerte quand un nouveau message arrive dans le groupe.';
+
+  static const String _partieChannelId = 'mission_resistance_partie';
+  static const String _partieChannelName = 'Fin de partie';
+  static const String _partieChannelDescription =
+      'Alerte quand le QG met fin à la partie.';
+  // Id fixe : une seule notification « fin de partie » à la fois (les rappels
+  // successifs remplacent la précédente plutôt que de s'empiler).
+  static const int _partieEndedNotifId = 1;
 
   Future<void> _ensureReady() async {
     if (_ready) return;
@@ -60,6 +70,30 @@ class LocalNotifier {
       id: messageId.hashCode & 0x7fffffff,
       title: 'Nouveau message radio',
       body: sender,
+      notificationDetails: details,
+    );
+  }
+
+  /// Affiche une notification « partie terminée » pour ramener le joueur vers le
+  /// poste (où l'écran de fin l'attend). Postée par l'isolate de suivi dès qu'il
+  /// détecte la fin de partie (`410`), donc même app fermée.
+  Future<void> showPartieEnded() async {
+    await _ensureReady();
+    const details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        _partieChannelId,
+        _partieChannelName,
+        channelDescription: _partieChannelDescription,
+        importance: Importance.high,
+        priority: Priority.high,
+        category: AndroidNotificationCategory.status,
+      ),
+      iOS: DarwinNotificationDetails(),
+    );
+    await _plugin.show(
+      id: _partieEndedNotifId,
+      title: Strings.partieEndedNotifTitle,
+      body: Strings.partieEndedNotifBody,
       notificationDetails: details,
     );
   }
