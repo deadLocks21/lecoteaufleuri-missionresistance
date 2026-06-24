@@ -26,6 +26,9 @@
 #   - Miroir push vers GitHub activé, tags inclus (Settings → Repository →
 #     Mirroring repositories), pour que le tag `v*` déclenche les Actions.
 
+variables:
+  GITHUB_MIRROR_URL: "https://github.com/ton-user/mission-resistance.git"
+
 stages:
   - release
 
@@ -55,3 +58,16 @@ semantic-release:
       when: never
     # Uniquement sur push direct main (pas sur MR, pas sur tag).
     - if: '$CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push"'
+
+mirror-to-github:
+  stage: .post
+  variables:
+    GIT_STRATEGY: clone
+    GIT_DEPTH: 0
+  before_script:
+    - git remote add github "https://oauth2:${GITHUB_TOKEN}@${GITHUB_MIRROR_URL#https://}"
+  script:
+    - git push --force --mirror github
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push"'
+    - if: '$CI_COMMIT_TAG'
