@@ -4,12 +4,15 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:geolocator/geolocator.dart';
+
 import '../../infrastructure/http/api_config.dart';
 import '../../infrastructure/telemetry/telemetry_providers.dart';
 import '../../infrastructure/tracking/geolocator_location_tracking.dart';
 import '../../infrastructure/tracking/http_position_reporter.dart';
 import '../../infrastructure/tracking/tracking_config.dart';
 import '../../infrastructure/tracking/tracking_task_handler.dart';
+import '../../domain/value_objects/gps_position.dart';
 import '../session/partie_controller.dart';
 import '../session/session_controller.dart';
 
@@ -72,10 +75,15 @@ class TrackingService extends Notifier<TrackingState> {
   // flutter_foreground_task. On fait donc tourner le GPS et l'envoi HTTP
   // directement dans l'isolate UI (qui reste vivant grâce au background mode
   // `location` de l'Info.plist).
+  //
+  // Le tracker iOS utilise distanceFilter=0 pour que CoreLocation réveille le
+  // Dart VM en continu (sans ça, iOS suspend le VM si l'équipe est stationnaire
+  // > ~10 min). Le filtrage des envois HTTP est appliqué ici (kDistanceFilterMeters).
   GeolocatorLocationTracking? _iosTracker;
   HttpPositionReporter? _iosReporter;
   StreamSubscription<dynamic>? _iosSub;
   Timer? _iosHeartbeatTimer;
+  GpsPosition? _iosLastReportedPos;
 
   @override
   TrackingState build() {
@@ -250,8 +258,11 @@ class TrackingService extends Notifier<TrackingState> {
     String? partieId,
     DateTime deadline,
   ) async {
-    _iosTracker =
-        GeolocatorLocationTracking(distanceFilterMeters: kDistanceFilterMeters);
+    // distanceFilter=0 : CoreLocation réveille le Dart VM à chaque fix (~2-3s)
+    // même en stationnaire, évitant la suspension iOS après ~10 min. Les envois
+    // HTTP sont filtrés en aval (kDistanceFilterMeters).
+    _iosTracker = GeolocatorLocationTracking(distanceFilterMeters: 0);
+    _iosLastReportedPos = null;
     if (kApiBaseUrl.isNotEmpty) {
       _iosReporter = HttpPositionReporter(
         baseUrl: kApiBaseUrl,
@@ -262,7 +273,17 @@ class TrackingService extends Notifier<TrackingState> {
     }
     _iosSub = _iosTracker!.positions().listen(
       (pos) {
-        _iosReporter?.report(pos);
+        final last = _iosLastReportedPos;
+        final dist = last == null
+            ? double.infinity
+            : Geolocator.distanceBetween(
+                last.latitude, last.longitude,
+                pos.latitude, pos.longitude,
+              );
+        if (dist >= kDistanceFilterMeters) {
+          _iosLastReportedPos = pos;
+          _iosReporter?.report(pos);
+        }
         state = state.copyWith(
           fixCount: state.fixCount + 1,
           lastFixAt: pos.timestamp,
@@ -281,6 +302,7 @@ class TrackingService extends Notifier<TrackingState> {
     _iosHeartbeatTimer = null;
     await _iosSub?.cancel();
     _iosSub = null;
+    _iosLastReportedPos = null;
     await _iosReporter?.dispose();
     _iosReporter = null;
     final tracker = _iosTracker;

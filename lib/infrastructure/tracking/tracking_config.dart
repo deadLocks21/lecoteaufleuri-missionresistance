@@ -13,9 +13,11 @@ DateTime? trackingConfiguredDeadline() {
   return DateTime.tryParse(_kTrackingDeadlineRaw);
 }
 
-/// Distance minimale (m) entre deux points — détermine aussi le rayon de la
-/// « zone » dessinée sur la carte.
-const int kDistanceFilterMeters = 50;
+/// Distance minimale (m) entre deux points reportés — détermine aussi le rayon
+/// de la « zone » dessinée sur la carte. Sur iOS, CoreLocation est configuré à
+/// 0 m pour maintenir le Dart VM éveillé ; ce seuil est appliqué au niveau
+/// applicatif avant d'envoyer une position au serveur.
+const int kDistanceFilterMeters = 20;
 
 /// Cadence du battement de cœur (équipe immobile). À garder **sous** le seuil
 /// de fraîcheur serveur (`POSITION_STALE_AFTER_SECONDS`, 120 s par défaut).
