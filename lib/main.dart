@@ -6,10 +6,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app/mission_resistance_app.dart';
 import 'application/services/logger_service.dart';
+import 'infrastructure/http/api_headers.dart';
 import 'infrastructure/telemetry/telemetry_providers.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Identifiant d'appareil stable (en-tête `X-Device-Id` sur chaque requête) :
+  // résolu une fois ici pour que les adapters HTTP le lisent de façon synchrone.
+  await DeviceId.ensureLoaded();
 
   // Port de communication isolate d'arrière-plan (suivi GPS) → isolate UI,
   // pour remonter les points capturés tant que l'app est ouverte.

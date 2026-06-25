@@ -4,6 +4,7 @@ import 'dart:developer' as developer;
 
 import 'package:dio/dio.dart';
 
+import '../http/api_headers.dart';
 import '../../domain/ports/position_reporter_port.dart';
 import '../../domain/value_objects/gps_position.dart';
 
@@ -39,7 +40,7 @@ class HttpPositionReporter implements PositionReporterPort {
                 receiveTimeout: const Duration(seconds: 15),
                 contentType: 'application/json',
                 responseType: ResponseType.plain,
-                headers: partieId == null ? null : {'X-Partie-Id': partieId},
+                headers: apiHeaders(partieId: partieId),
               ),
             ) {
     _timer = Timer.periodic(flushInterval, (_) => unawaited(flush()));

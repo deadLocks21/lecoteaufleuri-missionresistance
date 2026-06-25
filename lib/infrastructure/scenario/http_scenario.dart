@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../http/api_headers.dart';
 import '../../domain/entities/scenario.dart';
 import '../../domain/entities/team.dart';
 import '../../domain/ports/scenario_port.dart';
@@ -20,6 +21,7 @@ class HttpScenario implements ScenarioPort {
                 sendTimeout: const Duration(seconds: 8),
                 receiveTimeout: const Duration(seconds: 8),
                 contentType: 'application/json',
+                headers: apiHeaders(),
               ),
             );
 

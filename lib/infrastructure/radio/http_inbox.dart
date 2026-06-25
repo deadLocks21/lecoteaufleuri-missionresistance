@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../http/api_headers.dart';
 import '../../domain/entities/radio_message.dart';
 import '../../domain/ports/inbox_port.dart';
 import '../../domain/value_objects/message_id.dart';
@@ -29,7 +30,7 @@ class HttpInbox implements InboxPort {
                 connectTimeout: const Duration(seconds: 8),
                 receiveTimeout: const Duration(seconds: 8),
                 contentType: 'application/json',
-                headers: partieId == null ? null : {'X-Partie-Id': partieId},
+                headers: apiHeaders(partieId: partieId),
               ),
             );
 

@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../http/api_headers.dart';
 import '../../domain/entities/team.dart';
 import '../../domain/exceptions/domain_exception.dart';
 import '../../domain/ports/auth_port.dart';
@@ -25,6 +26,7 @@ class HttpAuth implements AuthPort {
                 sendTimeout: const Duration(seconds: 8),
                 receiveTimeout: const Duration(seconds: 8),
                 contentType: 'application/json',
+                headers: apiHeaders(),
               ),
             );
 

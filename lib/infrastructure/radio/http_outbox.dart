@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 
+import '../http/api_headers.dart';
 import '../../domain/entities/radio_message.dart';
 import '../../domain/ports/outbox_port.dart';
 import '../../domain/value_objects/recording.dart';
@@ -26,7 +27,7 @@ class HttpOutbox implements OutboxPort {
                 connectTimeout: const Duration(seconds: 8),
                 sendTimeout: const Duration(seconds: 30),
                 receiveTimeout: const Duration(seconds: 30),
-                headers: partieId == null ? null : {'X-Partie-Id': partieId},
+                headers: apiHeaders(partieId: partieId),
               ),
             );
 

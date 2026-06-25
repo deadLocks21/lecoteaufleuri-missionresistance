@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../http/api_headers.dart';
 import '../../domain/entities/team.dart';
 import '../../domain/ports/partie_port.dart';
 import '../../domain/value_objects/partie.dart';
@@ -18,6 +19,7 @@ class HttpPartie implements PartiePort {
                 connectTimeout: const Duration(seconds: 8),
                 receiveTimeout: const Duration(seconds: 8),
                 contentType: 'application/json',
+                headers: apiHeaders(),
               ),
             );
 

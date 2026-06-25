@@ -9,6 +9,7 @@ import '../../domain/ports/location_tracking_port.dart';
 import '../../domain/ports/position_reporter_port.dart';
 import '../../domain/value_objects/gps_position.dart';
 import '../http/api_config.dart';
+import '../http/api_headers.dart';
 import '../memory/in_memory_position_reporter.dart';
 import '../notifications/local_notifier.dart';
 import '../radio/http_inbox.dart';
@@ -54,6 +55,10 @@ class TrackingTaskHandler extends TaskHandler {
 
   @override
   Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
+    // Isolate de fond : ses statiques sont distinctes de l'UI, on recharge donc
+    // l'identifiant d'appareil pour que GPS/radio portent aussi `X-Device-Id`.
+    await DeviceId.ensureLoaded();
+
     final teamId = await FlutterForegroundTask.getData<String>(
           key: TrackingDataKeys.teamId,
         ) ??
