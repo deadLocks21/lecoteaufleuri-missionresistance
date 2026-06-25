@@ -60,9 +60,17 @@ jobs:
   prepare:
     name: Compute version
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 5
     outputs:
       version: ${{ steps.version.outputs.version }}
+      build_number: ${{ steps.build-number.outputs.build_number }}
+    env:
+      ANDROID_PACKAGE_NAME: "com.lecoteaufleuri.missionresistance"
+      GCLOUD_SERVICE_ACCOUNT_CREDENTIALS: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_CREDENTIALS }}
+      APP_STORE_CONNECT_KEY_IDENTIFIER: ${{ secrets.APP_STORE_CONNECT_KEY_IDENTIFIER }}
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+      APP_STORE_APPLE_ID: ${{ vars.APP_STORE_APPLE_ID }}
     steps:
       - uses: actions/checkout@v4
 
@@ -79,6 +87,36 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Building version: $VERSION"
 
+      - name: Setup Python (requis par codemagic-cli-tools)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install codemagic-cli-tools
+        run: pip install codemagic-cli-tools
+
+      - name: Compute shared build number (max des deux stores + 1)
+        # Un SEUL build number pour Android et iOS, calculé ici et propagé aux
+        # deux jobs build via l'output `build_number`. On prend le max des deux
+        # stores +1 : ça garantit un numéro identique, strictement croissant des
+        # deux côtés, et ça rattrape tout écart existant entre Play et App Store.
+        id: build-number
+        run: |
+          ANDROID_BUILD=$(google-play get-latest-build-number \
+            --package-name "$ANDROID_PACKAGE_NAME" \
+            --credentials "@env:GCLOUD_SERVICE_ACCOUNT_CREDENTIALS" \
+            --tracks production beta alpha internal 2>/dev/null || echo 0)
+          IOS_BUILD=$(app-store-connect get-latest-build-number \
+            "$APP_STORE_APPLE_ID" \
+            --platform IOS 2>/dev/null || echo 0)
+          ANDROID_BUILD=${ANDROID_BUILD:-0}
+          IOS_BUILD=${IOS_BUILD:-0}
+          MAX_BUILD=$(( ANDROID_BUILD > IOS_BUILD ? ANDROID_BUILD : IOS_BUILD ))
+          BUILD_NUMBER=$(( MAX_BUILD + 1 ))
+          echo "Android latest: $ANDROID_BUILD | iOS latest: $IOS_BUILD"
+          echo "Shared next build number: $BUILD_NUMBER"
+          echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+
   # ═══════════════════════════════════════════════════════════════════════
   # BUILD ANDROID — Compilation + signature + upload artifact (pas de publish)
   # ═══════════════════════════════════════════════════════════════════════
@@ -93,6 +131,7 @@ jobs:
       PACKAGE_NAME: "com.lecoteaufleuri.missionresistance"
       GCLOUD_SERVICE_ACCOUNT_CREDENTIALS: ${{ secrets.GCLOUD_SERVICE_ACCOUNT_CREDENTIALS }}
       VERSION: ${{ needs.prepare.outputs.version }}
+      BUILD_NUMBER: ${{ needs.prepare.outputs.build_number }}
       # URL du backend injectée au build (cf. infrastructure/http/api_config.dart).
       # VIDE → l'app sert le jumeau de démo (InMemory*), aucun appel réseau.
       API_BASE_URL: ${{ secrets.API_BASE_URL }}
@@ -148,24 +187,13 @@ jobs:
 
       - run: flutter pub get
 
-      - name: Compute build number from Google Play
-        id: build-number
-        run: |
-          LATEST_BUILD=$(google-play get-latest-build-number \
-            --package-name "$PACKAGE_NAME" \
-            --credentials "@env:GCLOUD_SERVICE_ACCOUNT_CREDENTIALS" \
-            --tracks production beta alpha internal 2>/dev/null || echo 0)
-          BUILD_NUMBER=$((${LATEST_BUILD:-0} + 1))
-          echo "Next Android build number: $BUILD_NUMBER"
-          echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
-
       - name: Build App Bundle (.aab)
         run: |
           flutter build appbundle --release \
             --build-name="$VERSION" \
-            --build-number="${{ steps.build-number.outputs.build_number }}" \
+            --build-number="$BUILD_NUMBER" \
             --dart-define=API_BASE_URL="$API_BASE_URL" \
-            --dart-define=APP_VERSION="$VERSION+${{ steps.build-number.outputs.build_number }}" \
+            --dart-define=APP_VERSION="$VERSION+$BUILD_NUMBER" \
             --dart-define=SIGNOZ_INGEST_URL="$SIGNOZ_INGEST_URL" \
             --dart-define=SIGNOZ_INGESTION_KEY="$SIGNOZ_INGESTION_KEY" \
             --dart-define=SIGNOZ_ENV="$SIGNOZ_ENV"
@@ -177,9 +205,9 @@ jobs:
         run: |
           flutter build apk --release \
             --build-name="$VERSION" \
-            --build-number="${{ steps.build-number.outputs.build_number }}" \
+            --build-number="$BUILD_NUMBER" \
             --dart-define=API_BASE_URL="$API_BASE_URL" \
-            --dart-define=APP_VERSION="$VERSION+${{ steps.build-number.outputs.build_number }}" \
+            --dart-define=APP_VERSION="$VERSION+$BUILD_NUMBER" \
             --dart-define=SIGNOZ_INGEST_URL="$SIGNOZ_INGEST_URL" \
             --dart-define=SIGNOZ_INGESTION_KEY="$SIGNOZ_INGESTION_KEY" \
             --dart-define=SIGNOZ_ENV="$SIGNOZ_ENV"
@@ -212,6 +240,7 @@ jobs:
       BUNDLE_ID: "com.lecoteaufleuri.missionresistance"
       APP_STORE_APPLE_ID: ${{ vars.APP_STORE_APPLE_ID }}
       VERSION: ${{ needs.prepare.outputs.version }}
+      BUILD_NUMBER: ${{ needs.prepare.outputs.build_number }}
       # URL du backend injectée au build (cf. job Android). VIDE → jumeau démo.
       API_BASE_URL: ${{ secrets.API_BASE_URL }}
       # Télémétrie Signoz injectée au build via --dart-define (cf. job Android).
@@ -278,24 +307,14 @@ jobs:
           cd ios
           pod install
 
-      - name: Compute build number from App Store Connect (iOS)
-        id: build-number
-        run: |
-          LATEST_BUILD=$(app-store-connect get-latest-build-number \
-            "$APP_STORE_APPLE_ID" \
-            --platform IOS)
-          BUILD_NUMBER=$((LATEST_BUILD + 1))
-          echo "Next iOS build number: $BUILD_NUMBER"
-          echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
-
       - name: Build IPA
         run: |
           flutter build ipa --release \
             --build-name="$VERSION" \
-            --build-number="${{ steps.build-number.outputs.build_number }}" \
+            --build-number="$BUILD_NUMBER" \
             --export-options-plist="$HOME/export_options.plist" \
             --dart-define=API_BASE_URL="$API_BASE_URL" \
-            --dart-define=APP_VERSION="$VERSION+${{ steps.build-number.outputs.build_number }}" \
+            --dart-define=APP_VERSION="$VERSION+$BUILD_NUMBER" \
             --dart-define=SIGNOZ_INGEST_URL="$SIGNOZ_INGEST_URL" \
             --dart-define=SIGNOZ_INGESTION_KEY="$SIGNOZ_INGESTION_KEY" \
             --dart-define=SIGNOZ_ENV="$SIGNOZ_ENV"
