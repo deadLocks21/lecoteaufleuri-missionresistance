@@ -117,7 +117,9 @@ class TrackingTaskHandler extends TaskHandler {
       }
     }
 
-    await _startRadioWatch(teamId, partieId);
+    // Sur iOS le radio watch tourne dans l'isolate UI (TrackingService) car le
+    // background isolate n'est pas maintenu en vie par CoreLocation.
+    if (!_isIos) await _startRadioWatch(teamId, partieId);
   }
 
   /// Démarre la veille radio : `fetch()` **amorce** le set des ids déjà vus pour

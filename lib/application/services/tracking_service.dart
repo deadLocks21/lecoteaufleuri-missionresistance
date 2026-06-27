@@ -6,15 +6,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:geolocator/geolocator.dart';
 
+import '../../domain/entities/radio_message.dart';
+import '../../domain/value_objects/gps_position.dart';
 import '../../infrastructure/http/api_config.dart';
+import '../../infrastructure/notifications/local_notifier.dart';
+import '../../infrastructure/radio/http_inbox.dart';
 import '../../infrastructure/telemetry/telemetry_providers.dart';
 import '../../infrastructure/tracking/geolocator_location_tracking.dart';
 import '../../infrastructure/tracking/http_position_reporter.dart';
 import '../../infrastructure/tracking/tracking_config.dart';
 import '../../infrastructure/tracking/tracking_task_handler.dart';
-import '../../domain/value_objects/gps_position.dart';
 import '../session/partie_controller.dart';
 import '../session/session_controller.dart';
+import 'inbox_service.dart';
 
 enum TrackingStatus { idle, active, stopped, denied, expired }
 
@@ -84,6 +88,8 @@ class TrackingService extends Notifier<TrackingState> {
   StreamSubscription<dynamic>? _iosSub;
   Timer? _iosHeartbeatTimer;
   GpsPosition? _iosLastReportedPos;
+  HttpInbox? _iosInbox;
+  StreamSubscription<RadioMessage>? _iosRadioSub;
 
   @override
   TrackingState build() {
@@ -295,6 +301,33 @@ class TrackingService extends Notifier<TrackingState> {
     _iosHeartbeatTimer =
         Timer.periodic(kHeartbeatInterval, (_) => _iosHeartbeat(deadline));
     _log('tracking.ios_gps_started');
+
+    // Radio watch dans l'isolate UI : le background isolate n'est pas maintenu
+    // en vie par CoreLocation sur iOS, donc les messages et notifications ne
+    // parviendraient jamais depuis le handler de fond.
+    if (kApiBaseUrl.isNotEmpty) {
+      final inbox = HttpInbox(baseUrl: kApiBaseUrl, teamId: teamId, partieId: partieId);
+      _iosInbox = inbox;
+      try {
+        await inbox.fetch();
+      } catch (_) {}
+      final notifier = LocalNotifier();
+      _iosRadioSub = inbox.incoming().listen(
+        (message) {
+          if (!message.mine) {
+            unawaited(notifier.showNewMessage(
+              messageId: message.id.value,
+              sender: message.sender,
+            ));
+          }
+          try {
+            ref.read(inboxServiceProvider.notifier).addReceived(message);
+          } catch (_) {}
+        },
+        onError: (Object e, StackTrace st) =>
+            _log('tracking.ios_radio_error', error: e, stack: st),
+      );
+    }
   }
 
   Future<void> _stopIosTracking() async {
@@ -303,6 +336,10 @@ class TrackingService extends Notifier<TrackingState> {
     await _iosSub?.cancel();
     _iosSub = null;
     _iosLastReportedPos = null;
+    await _iosRadioSub?.cancel();
+    _iosRadioSub = null;
+    _iosInbox?.dispose();
+    _iosInbox = null;
     await _iosReporter?.dispose();
     _iosReporter = null;
     final tracker = _iosTracker;

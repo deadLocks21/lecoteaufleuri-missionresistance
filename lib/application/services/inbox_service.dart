@@ -59,6 +59,10 @@ class InboxService extends AsyncNotifier<List<RadioMessage>> {
   /// un retour immédiat « message parti ✓ » sans attendre le prochain sondage.
   void addSent(RadioMessage message) => _prepend(message);
 
+  /// Insère un **message reçu** poussé depuis l'isolate UI (iOS uniquement, où
+  /// le background isolate ne reste pas en vie).
+  void addReceived(RadioMessage message) => _prepend(message);
+
   /// Joue un message : passe en `playing`, lit l'audio (réel si `audioUrl`,
   /// sinon délai simulé en démo), puis `heard` (et persiste le « lu »).
   Future<void> play(MessageId id) async {
