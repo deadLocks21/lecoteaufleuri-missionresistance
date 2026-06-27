@@ -63,11 +63,13 @@ class LocalNotifier {
         importance: Importance.high,
         priority: Priority.high,
         category: AndroidNotificationCategory.message,
+        sound: RawResourceAndroidNotificationSound('radio_static'),
       ),
       iOS: DarwinNotificationDetails(
         presentAlert: true,
         presentSound: true,
         presentBadge: false,
+        sound: 'radio_static.wav',
       ),
     );
     await _plugin.show(
