@@ -1,4 +1,5 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../ui/strings.dart';
 
@@ -16,9 +17,10 @@ class LocalNotifier {
   final FlutterLocalNotificationsPlugin _plugin;
   bool _ready = false;
 
-  // v2 : canal recréé pour inclure le son custom (radio_static.wav).
-  // Les canaux Android sont immuables — changer l'id force la recréation.
-  static const String _channelId = 'mission_resistance_radio_v2';
+  // Résolu lors de _ensureReady() : mission_resistance_radio_<major>_<minor>_<patch>.
+  // Les canaux Android sont immuables : un canal par version force la recréation
+  // avec les nouveaux réglages (son, importance…) à chaque mise à jour.
+  String _channelId = 'mission_resistance_radio';
   static const String _channelName = 'Messages radio';
   static const String _channelDescription =
       'Alerte quand un nouveau message arrive dans le groupe.';
@@ -33,6 +35,14 @@ class LocalNotifier {
 
   Future<void> _ensureReady() async {
     if (_ready) return;
+    try {
+      final info = await PackageInfo.fromPlatform();
+      final v = info.version.replaceAll('.', '_');
+      _channelId = 'mission_resistance_radio_$v';
+    } catch (_) {
+      // Fallback pour les tests unitaires / environnements sans platform channels.
+      _channelId = 'mission_resistance_radio_v2';
+    }
     // La permission POST_NOTIFICATIONS (Android 13+) / l'autorisation iOS sont
     // déjà demandées côté UI au démarrage du suivi
     // (`TrackingService._ensureNotificationPermission`). On ne re-demande pas ici
@@ -57,7 +67,7 @@ class LocalNotifier {
     required String sender,
   }) async {
     await _ensureReady();
-    const details = NotificationDetails(
+    final details = NotificationDetails(
       android: AndroidNotificationDetails(
         _channelId,
         _channelName,
@@ -65,9 +75,9 @@ class LocalNotifier {
         importance: Importance.high,
         priority: Priority.high,
         category: AndroidNotificationCategory.message,
-        sound: RawResourceAndroidNotificationSound('radio_static'),
+        sound: const RawResourceAndroidNotificationSound('radio_static'),
       ),
-      iOS: DarwinNotificationDetails(
+      iOS: const DarwinNotificationDetails(
         presentAlert: true,
         presentSound: true,
         presentBadge: false,

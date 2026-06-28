@@ -53,6 +53,7 @@ dependencies:
   # d'arrière-plan du suivi (seul poller pendant la partie). Canal dédié, distinct
   # de la notif permanente du service de premier plan.
   flutter_local_notifications: ^22.0.1
+  package_info_plus: ^8.0.0
 
 dev_dependencies:
   flutter_test:
