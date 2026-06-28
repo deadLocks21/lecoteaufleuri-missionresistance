@@ -16,7 +16,9 @@ class LocalNotifier {
   final FlutterLocalNotificationsPlugin _plugin;
   bool _ready = false;
 
-  static const String _channelId = 'mission_resistance_radio';
+  // v2 : canal recréé pour inclure le son custom (radio_static.wav).
+  // Les canaux Android sont immuables — changer l'id force la recréation.
+  static const String _channelId = 'mission_resistance_radio_v2';
   static const String _channelName = 'Messages radio';
   static const String _channelDescription =
       'Alerte quand un nouveau message arrive dans le groupe.';
