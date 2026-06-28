@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AGP 8+ : les règles tools:keep doivent être dans res/raw/, pas res/values/.
+     Le shrinker lit ce fichier directement avant de décider quoi supprimer.
+     Sans ça, radio_static.wav est marqué reachable=false (seule référence =
+     string dynamique dans flutter_local_notifications) et supprimé de l'APK. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@raw/radio_static" />
