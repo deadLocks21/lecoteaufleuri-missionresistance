@@ -64,6 +64,13 @@ android {
             } else {
                 signingConfigs.getByName("debug")
             }
+            // R8 actif par défaut en release Flutter. On protège les classes de
+            // flutter_local_notifications (Gson) qui seraient sinon obfusquées,
+            // cassant les notifications silencieusement en release.
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 }
