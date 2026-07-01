@@ -30,6 +30,13 @@ abstract final class Strings {
       'MISSION $number/$total — ${title.toUpperCase()} — '
       '$unlocked/$clueCount INDICE${clueCount > 1 ? 'S' : ''}';
 
+  // Coupe-radio (régie) — affiché quand le poste central « tombe aux mains des
+  // Allemands » : émission refusée à tous les postes sauf les nazis.
+  static const radioBlockedTitle = 'RADIO COUPÉE';
+  static const radioBlockedNotice =
+      'Le poste de radio central est tombé aux mains des Allemands.';
+  static const pttBlocked = 'Émission impossible — radio coupée';
+
   // Émission
   static const sectionEmission = 'Émission';
   static const vuLabel = "NIVEAU D'ÉMISSION";

@@ -9,9 +9,13 @@ import '../../theme/app_text_styles.dart';
 import '../../widgets/app_icons.dart';
 
 /// Bouton TRANSMETTRE — push-to-talk (BRIEF §8.1.b). Appui maintenu → émission
-/// (rouge enfoncé, chrono, voyant pulsé) ; relâché → envoi.
+/// (rouge enfoncé, chrono, voyant pulsé) ; relâché → envoi. Quand [enabled] est
+/// `false` (radio coupée par la régie), le bouton est grisé, verrouillé et inerte.
 class PttButton extends ConsumerWidget {
-  const PttButton({super.key});
+  const PttButton({super.key, this.enabled = true});
+
+  /// `false` → émission impossible (radio coupée) : bouton grisé et non réactif.
+  final bool enabled;
 
   void _start(WidgetRef ref) {
     ref.read(emissionServiceProvider.notifier).startTx();
@@ -26,6 +30,7 @@ class PttButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (!enabled) return const _BlockedPtt();
     final phase = ref.watch(emissionServiceProvider.select((s) => s.phase));
     final seconds = ref.watch(emissionServiceProvider.select((s) => s.seconds));
     final live = phase == EmissionPhase.live;
@@ -103,6 +108,61 @@ class PttButton extends ConsumerWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Variante grisée et verrouillée du bouton TRANSMETTRE, affichée quand la régie
+/// a coupé la radio : aspect olive éteint, cadenas, et **aucune interaction**
+/// (pas de `Listener`, donc l'appui n'ouvre pas le micro).
+class _BlockedPtt extends StatelessWidget {
+  const _BlockedPtt();
+
+  @override
+  Widget build(BuildContext context) {
+    const fg = Color(0xFFC7C3A8);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(13),
+        gradient: const RadialGradient(
+          center: Alignment(0, -0.76),
+          radius: 1.3,
+          colors: [Color(0xFF6E7358), Color(0xFF4C5039), Color(0xFF343827)],
+          stops: [0, 0.6, 1],
+        ),
+        boxShadow: const [
+          BoxShadow(color: Color(0xFF191A12), offset: Offset(0, 3)),
+        ],
+      ),
+      child: Row(
+        children: [
+          AppIcons.lock(28, fg),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  Strings.transmit,
+                  style: AppText.display(size: 18, color: fg, height: 1.1, letterSpacing: 1),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  Strings.pttBlocked,
+                  style: AppText.body(
+                    size: 11,
+                    weight: FontWeight.w600,
+                    color: fg.withValues(alpha: 0.85),
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
