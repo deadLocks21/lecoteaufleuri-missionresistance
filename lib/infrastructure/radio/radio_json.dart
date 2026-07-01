@@ -1,10 +1,11 @@
 import '../../domain/entities/radio_message.dart';
 import '../../domain/value_objects/message_id.dart';
+import '../../domain/value_objects/message_recipient.dart';
 
 /// (Dé)sérialisation des messages radio — contrat JSON partagé avec l'API
-/// (`{ id, sender, sentAt, durationMs, mine }`). L'`audioUrl` n'est **pas**
+/// (`{ id, sender, sentAt, durationMs, mine, to }`). L'`audioUrl` n'est **pas**
 /// transmise par le backend : on la dérive de l'id (endpoint de flux proxy
-/// kDrive).
+/// kDrive). `to` = destinataire (`{ kind: all|centrals|team, name?, self? }`).
 
 /// Sous-titres neutres (le backend ne porte pas de « flavor » ; même esprit que
 /// les sous-titres en dur de `demo_data.dart`).
@@ -29,7 +30,23 @@ RadioMessage radioMessageFromJson(
     audioUrl: '$audioBase/$id/audio',
     status: mine ? MessageStatus.heard : MessageStatus.unread,
     mine: mine,
+    recipient: _recipientFromJson(json['to']),
   );
+}
+
+/// Lit le descripteur `to` du contrat serveur, ou `null` s'il est absent.
+MessageRecipient? _recipientFromJson(Object? raw) {
+  if (raw is! Map) return null;
+  return switch (raw['kind']) {
+    'all' => const MessageRecipient(kind: RecipientKind.all),
+    'centrals' => const MessageRecipient(kind: RecipientKind.centrals),
+    'team' => MessageRecipient(
+        kind: RecipientKind.team,
+        name: raw['name'] as String?,
+        self: raw['self'] == true,
+      ),
+    _ => null,
+  };
 }
 
 /// Liste reçue (déjà triée récent → ancien côté API).
@@ -48,7 +65,7 @@ const String kRadioMessageEvent = 'radio';
 
 /// Sérialise un [RadioMessage] pour le passage **isolate de fond → isolate UI**
 /// (`sendDataToMain` n'accepte que des primitives). On transporte l'`audioUrl`
-/// déjà dérivée plutôt que de la recalculer côté UI.
+/// déjà dérivée plutôt que de la recalculer côté UI, et le destinataire à plat.
 Map<String, Object?> radioMessageToData(RadioMessage message) => {
       'event': kRadioMessageEvent,
       'id': message.id.value,
@@ -59,6 +76,9 @@ Map<String, Object?> radioMessageToData(RadioMessage message) => {
       'audioUrl': message.audioUrl,
       'status': message.status.name,
       'mine': message.mine,
+      'toKind': message.recipient?.kind.name,
+      'toName': message.recipient?.name,
+      'toSelf': message.recipient?.self,
     };
 
 /// Reconstruit un [RadioMessage] côté UI depuis la charge de [radioMessageToData].
@@ -71,4 +91,20 @@ RadioMessage radioMessageFromData(Map<dynamic, dynamic> data) => RadioMessage(
       audioUrl: data['audioUrl'] as String?,
       status: MessageStatus.values.byName(data['status'] as String),
       mine: data['mine'] == true,
+      recipient: _recipientFromData(data),
     );
+
+/// Reconstruit le destinataire depuis la charge isolate (clés à plat `toKind` /
+/// `toName` / `toSelf` posées par [radioMessageToData]).
+MessageRecipient? _recipientFromData(Map<dynamic, dynamic> data) {
+  return switch (data['toKind']) {
+    'all' => const MessageRecipient(kind: RecipientKind.all),
+    'centrals' => const MessageRecipient(kind: RecipientKind.centrals),
+    'team' => MessageRecipient(
+        kind: RecipientKind.team,
+        name: data['toName'] as String?,
+        self: data['toSelf'] == true,
+      ),
+    _ => null,
+  };
+}

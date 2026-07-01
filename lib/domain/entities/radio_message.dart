@@ -1,4 +1,5 @@
 import '../value_objects/message_id.dart';
+import '../value_objects/message_recipient.dart';
 
 /// Statut d'un message reçu (BRIEF §8.2).
 enum MessageStatus {
@@ -28,6 +29,7 @@ class RadioMessage {
     this.audioUrl,
     this.status = MessageStatus.unread,
     this.mine = false,
+    this.recipient,
   });
 
   final MessageId id;
@@ -48,6 +50,11 @@ class RadioMessage {
   /// (confirmation d'envoi) plutôt que reçu d'un autre poste du groupe.
   final bool mine;
 
+  /// Destinataire du message (« → TOUT LE MONDE » / « → POSTES CENTRAUX » /
+  /// « → ÉQUIPE X » / « → VOUS »). `null` = pas d'adressage (démo / ancien
+  /// contrat).
+  final MessageRecipient? recipient;
+
   bool get isUnread => status == MessageStatus.unread;
   bool get isLoading => status == MessageStatus.loading;
   bool get isPlaying => status == MessageStatus.playing;
@@ -67,6 +74,7 @@ class RadioMessage {
       audioUrl: audioUrl,
       status: status ?? this.status,
       mine: mine,
+      recipient: recipient,
     );
   }
 }

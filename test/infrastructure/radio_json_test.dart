@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mission_resistance/domain/entities/radio_message.dart';
 import 'package:mission_resistance/domain/value_objects/message_id.dart';
+import 'package:mission_resistance/domain/value_objects/message_recipient.dart';
 import 'package:mission_resistance/infrastructure/radio/radio_json.dart';
 
 /// Verrouille le **contrat JSON** des messages radio partagé avec l'API
@@ -57,6 +58,33 @@ void main() {
     test('liste vide → aucune tuile', () {
       expect(radioMessagesFromJson(const [], audioBase: audioBase), isEmpty);
     });
+
+    test('mappe le destinataire `to` (all / centrals / team + self)', () {
+      RadioMessage parse(Object? to) => radioMessagesFromJson(
+            [
+              {
+                'id': 'x',
+                'sender': 'Les bleus',
+                'sentAt': '2026-06-21T17:20:34.082Z',
+                'durationMs': 1000,
+                if (to != null) 'to': to,
+              },
+            ],
+            audioBase: audioBase,
+          ).single;
+
+      expect(parse({'kind': 'all'}).recipient?.kind, RecipientKind.all);
+      expect(parse({'kind': 'centrals'}).recipient?.kind, RecipientKind.centrals);
+
+      final team = parse({'kind': 'team', 'name': 'ÉQUIPE LYNX', 'self': true})
+          .recipient;
+      expect(team?.kind, RecipientKind.team);
+      expect(team?.name, 'ÉQUIPE LYNX');
+      expect(team?.self, isTrue);
+
+      // Descripteur absent (démo / ancien contrat) → pas d'adressage.
+      expect(parse(null).recipient, isNull);
+    });
   });
 
   group('transport isolate de fond → UI', () {
@@ -100,6 +128,26 @@ void main() {
       final restored = radioMessageFromData(radioMessageToData(mine));
       expect(restored.mine, isTrue);
       expect(restored.status, MessageStatus.heard);
+    });
+
+    test('le destinataire (équipe + nom + self) survit à l’aller-retour', () {
+      final msg = RadioMessage(
+        id: const MessageId('t-1'),
+        sender: 'QG CENTRAL',
+        sentAt: DateTime.parse('2026-06-21T17:20:34.082Z'),
+        duration: const Duration(milliseconds: 4200),
+        subtitle: 'Transmission vocale',
+        recipient: const MessageRecipient(
+          kind: RecipientKind.team,
+          name: 'ÉQUIPE LYNX',
+          self: true,
+        ),
+      );
+
+      final restored = radioMessageFromData(radioMessageToData(msg));
+      expect(restored.recipient?.kind, RecipientKind.team);
+      expect(restored.recipient?.name, 'ÉQUIPE LYNX');
+      expect(restored.recipient?.self, isTrue);
     });
   });
 }

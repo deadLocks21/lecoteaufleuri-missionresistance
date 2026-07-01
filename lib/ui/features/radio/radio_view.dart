@@ -12,6 +12,7 @@ import '../../widgets/section_label.dart';
 import 'appel_button.dart';
 import 'message_tile.dart';
 import 'ptt_button.dart';
+import 'recipient_selector.dart';
 import 'vu_meter.dart';
 
 /// Onglet « Trafic radio » (BRIEF §8) : émission (VU-mètre, PTT, appel QG) puis
@@ -31,7 +32,15 @@ class RadioView extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (denied) const _RadioBlockedBanner(),
-        const SectionLabel(Strings.sectionEmission, topMargin: 2),
+        // Section « Destinataire » réservée aux postes qui adressent (central /
+        // nazi) : un poste portable émet toujours vers les centraux, on ne lui
+        // montre donc pas de sélecteur.
+        if (gate.canAddress) ...[
+          const SectionLabel(Strings.sectionRecipient, topMargin: 2),
+          const RecipientSelector(),
+          const SectionLabel(Strings.sectionEmission),
+        ] else
+          const SectionLabel(Strings.sectionEmission, topMargin: 2),
         const VuMeter(),
         PttButton(enabled: !denied),
         const AppelButton(),

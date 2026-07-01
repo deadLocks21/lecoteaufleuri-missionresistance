@@ -6,13 +6,15 @@ import 'package:dio/dio.dart';
 import '../http/api_headers.dart';
 import '../../domain/entities/radio_message.dart';
 import '../../domain/ports/outbox_port.dart';
+import '../../domain/value_objects/message_target.dart';
 import '../../domain/value_objects/recording.dart';
 import 'radio_json.dart';
 
 /// Adapter réseau de [OutboxPort] : diffuse une émission via
 /// `POST /sessions/<teamId>/radio` (multipart : fichier `audio` + champ
-/// `duration_ms`). Le backend persiste l'audio sur kDrive et l'indexe dans le
-/// groupe de l'équipe. Le fichier temporaire local est supprimé après l'envoi.
+/// `duration_ms` + champ optionnel `target`). Le backend persiste l'audio sur
+/// kDrive, l'**adresse** selon le rôle de l'émetteur, et l'indexe dans le groupe
+/// de l'équipe. Le fichier temporaire local est supprimé après l'envoi.
 class HttpOutbox implements OutboxPort {
   HttpOutbox({
     required String baseUrl,
@@ -41,11 +43,14 @@ class HttpOutbox implements OutboxPort {
   String get _audioBase => '$_base/sessions/$teamId/radio';
 
   @override
-  Future<RadioMessage> send(Recording recording) async {
+  Future<RadioMessage> send(Recording recording, {MessageTarget? target}) async {
     final file = File(recording.path);
     try {
       final form = FormData.fromMap({
         'duration_ms': recording.duration.inMilliseconds.toString(),
+        // Destinataire choisi par un central / nazi (`all` ou l'uuid d'équipe).
+        // Absent pour un portable → le serveur force « vers les postes centraux ».
+        if (target != null) 'target': target.wire,
         'audio': await MultipartFile.fromFile(
           recording.path,
           filename: 'message.m4a',

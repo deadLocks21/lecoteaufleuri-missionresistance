@@ -14,6 +14,8 @@ import '../config/timings.dart';
 import '../session/partie_controller.dart';
 import '../session/session_controller.dart';
 import 'inbox_service.dart';
+import 'radio_gate_service.dart';
+import 'recipient_service.dart';
 
 /// Phase du push-to-talk.
 enum EmissionPhase { idle, live, sent }
@@ -117,7 +119,13 @@ class EmissionService extends Notifier<EmissionState> {
 
   Future<void> _broadcast(Recording recording) async {
     try {
-      final message = await ref.read(outboxPortProvider).send(recording);
+      // Le destinataire n'est joint que si ce poste peut adresser (central /
+      // nazi) ; un portable émet sans `target` (le serveur force « centraux »).
+      final canAddress =
+          ref.read(radioGateServiceProvider).asData?.value.canAddress ?? false;
+      final target = canAddress ? ref.read(selectedRecipientProvider) : null;
+      final message =
+          await ref.read(outboxPortProvider).send(recording, target: target);
       // Émission confirmée (persistée) → apparaît tout de suite dans la
       // réception, marquée « ÉMIS ». Échec → rien (pas de fausse confirmation).
       ref.read(inboxServiceProvider.notifier).addSent(message);

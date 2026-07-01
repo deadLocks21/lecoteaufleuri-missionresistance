@@ -37,6 +37,13 @@ abstract final class Strings {
       'Le poste de radio central est tombé aux mains des Allemands.';
   static const pttBlocked = 'Émission impossible — radio coupée';
 
+  // Destinataire (adressage) — un poste central / nazi choisit sa cible (section
+  // masquée pour un poste portable, qui émet toujours vers les postes centraux).
+  static const sectionRecipient = 'Destinataire';
+  static const recipientEveryone = 'TOUT LE MONDE';
+  static const recipientCentrals = 'POSTES CENTRAUX';
+  static const recipientYou = 'VOUS';
+
   // Émission
   static const sectionEmission = 'Émission';
   static const vuLabel = "NIVEAU D'ÉMISSION";

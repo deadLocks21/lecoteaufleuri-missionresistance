@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../application/config/timings.dart';
 import '../../../application/services/inbox_service.dart';
 import '../../../domain/entities/radio_message.dart';
+import '../../../domain/value_objects/message_recipient.dart';
 import '../../state/ticker_controller.dart';
 import '../../strings.dart';
 import '../../theme/app_colors.dart';
@@ -24,6 +25,18 @@ class MessageTile extends ConsumerWidget {
 
   static String _mmss(Duration d) =>
       '${d.inMinutes}:${(d.inSeconds % 60).toString().padLeft(2, '0')}';
+
+  /// Libellé destinataire « → … » (ou `null` si le message n'est pas adressé,
+  /// p. ex. en démo).
+  static String? _recipientLabel(MessageRecipient? r) {
+    if (r == null) return null;
+    final to = switch (r.kind) {
+      RecipientKind.all => Strings.recipientEveryone,
+      RecipientKind.centrals => Strings.recipientCentrals,
+      RecipientKind.team => r.self ? Strings.recipientYou : (r.name ?? ''),
+    };
+    return to.isEmpty ? null : '→ $to';
+  }
 
   Future<void> _play(WidgetRef ref) async {
     if (message.isActive) return;
@@ -117,7 +130,7 @@ class MessageTile extends ConsumerWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    message.subtitle,
+                    _recipientLabel(message.recipient) ?? message.subtitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: AppText.mono(size: 11, color: const Color(0xFFA9B389)),
