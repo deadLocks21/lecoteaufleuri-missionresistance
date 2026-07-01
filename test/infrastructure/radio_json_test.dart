@@ -67,7 +67,7 @@ void main() {
                 'sender': 'Les bleus',
                 'sentAt': '2026-06-21T17:20:34.082Z',
                 'durationMs': 1000,
-                if (to != null) 'to': to,
+                'to': ?to,
               },
             ],
             audioBase: audioBase,
